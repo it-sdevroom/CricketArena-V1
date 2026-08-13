@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Cricket Arena",
+    "slug": "cricket-arena",
+    "version": "2.1.0",
+    "orientation": "portrait",
+    "scheme": "cricketarena",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nauman.cricketarena"
+    },
+    "android": {
+      "package": "com.nauman.cricketarena",
+      "adaptiveIcon": {
+        "backgroundColor": "#071A16"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
