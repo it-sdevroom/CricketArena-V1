@@ -33,7 +33,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22, not 20: the runners deprecated Node 20, and several tools here
+          # (including the test runner's glob handling) assume 22 or newer.
+          node-version: 22
           cache: npm
 
       - run: npm ci
@@ -55,7 +57,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22, not 20: the runners deprecated Node 20, and several tools here
+          # (including the test runner's glob handling) assume 22 or newer.
+          node-version: 22
           cache: npm
 
       - run: npm ci
