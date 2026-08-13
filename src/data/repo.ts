@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '@/src/lib/supabase';
+import { authRedirectUrl } from '@/src/lib/redirect';
 import { generateFixtures, type TournamentFormat } from '@/src/domain/fixtures';
 
 import { enqueueDelivery, newIdempotencyKey } from './queue';
@@ -58,7 +59,12 @@ export const auth = {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: { full_name: fullName },
+        // Without this the confirmation link uses Supabase's Site URL, which
+        // defaults to http://localhost:3000 and hangs forever on a phone.
+        emailRedirectTo: authRedirectUrl('/'),
+      },
     });
     if (error) throw error;
     return data;
@@ -78,7 +84,19 @@ export const auth = {
   },
 
   async sendPasswordReset(email: string, redirectTo?: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectTo ?? authRedirectUrl('/'),
+    });
+    if (error) throw error;
+  },
+
+  /** Re-send the confirmation email, for a link that expired or never arrived. */
+  async resendConfirmation(email: string) {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: authRedirectUrl('/') },
+    });
     if (error) throw error;
   },
 
