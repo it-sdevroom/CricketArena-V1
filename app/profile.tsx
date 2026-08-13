@@ -70,6 +70,26 @@ export default function Profile() {
           </Card>
         </Section>
       ) : null}
+
+      <Section title="Privacy">
+        <Button title="Privacy policy" secondary onPress={() => router.push('/legal/privacy')} />
+      </Section>
+
+      <Section title="Danger zone">
+        <Card style={s.danger}>
+          <Text style={s.dangerTitle}>Delete your account</Text>
+          <Text style={s.dangerBody}>
+            This removes your login, profile, follows and notifications, and cannot be undone.
+            Matches you have already played in keep their scorecards — those runs belong to the
+            match, not to your login — but they will no longer be linked to your account.
+          </Text>
+          <Button
+            title="Delete my account"
+            danger
+            onPress={() => router.push('/legal/delete-account')}
+          />
+        </Card>
+      </Section>
     </Screen>
   );
 }
@@ -81,4 +101,7 @@ const s = StyleSheet.create({
   roles: { gap: 9 },
   roleLine: { color: C.muted, fontSize: 13, textTransform: 'capitalize' },
   roleOrg: { color: C.white, fontWeight: '800' },
+  danger: { gap: 12, borderColor: C.red + '55' },
+  dangerTitle: { color: C.white, fontWeight: '900', fontSize: 15 },
+  dangerBody: { color: C.muted, fontSize: 13, lineHeight: 19 },
 });

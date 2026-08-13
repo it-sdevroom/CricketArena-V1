@@ -16,7 +16,9 @@
     "build:android": "eas build --platform android --profile preview",
     "build:ios": "eas build --platform ios --profile preview",
     "build:web": "expo export --platform web --output-dir dist && node scripts/create-sites-worker.mjs",
-    "verify:combined": "tsx scripts/verify-combined-sql.ts"
+    "verify:combined": "tsx scripts/verify-combined-sql.ts",
+    "icons": "node scripts/generate-icons.mjs",
+    "sql:build": "node scripts/build-setup-sql.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

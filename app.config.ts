@@ -21,26 +21,55 @@ const baseUrl = !rawBaseUrl || rawBaseUrl === '/' ? undefined : rawBaseUrl.repla
 const config: ExpoConfig = {
   name: 'Cricket Arena',
   slug: 'cricket-arena',
-  version: '2.0.0',
+  version: '2.1.0',
   orientation: 'portrait',
   scheme: 'cricketarena',
   userInterfaceStyle: 'dark',
   newArchEnabled: true,
   backgroundColor: '#061713',
+  icon: './assets/icon.png',
+  // Regenerate the whole set from the theme with: npm run icons
+  splash: {
+    image: './assets/splash-icon.png',
+    resizeMode: 'contain',
+    backgroundColor: '#061713',
+  },
 
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'com.nauman.cricketarena',
+    // App Store Connect requires this to increase with every upload.
+    buildNumber: '1',
     infoPlist: {
       // Live scoring is used outdoors on patchy mobile data.
       NSAppTransportSecurity: { NSAllowsArbitraryLoads: false },
+      // Both strings are shown verbatim in the iOS permission prompt, and
+      // review rejects the build if they are vague about why access is needed.
+      NSPhotoLibraryUsageDescription:
+        'Choose a profile photo for your player registration.',
+      NSCameraUsageDescription:
+        'Take a profile photo for your player registration.',
+      ITSAppUsesNonExemptEncryption: false,
     },
   },
 
   android: {
     package: 'com.nauman.cricketarena',
-    adaptiveIcon: { backgroundColor: '#071A16' },
+    // Google Play requires this to increase with every upload.
+    versionCode: 1,
+    adaptiveIcon: {
+      foregroundImage: './assets/adaptive-icon.png',
+      backgroundColor: '#071A16',
+    },
     edgeToEdgeEnabled: true,
+    permissions: ['android.permission.READ_MEDIA_IMAGES'],
+    // Everything else is derived; blocking the defaults keeps the Play data
+    // safety form honest and short.
+    blockedPermissions: [
+      'android.permission.RECORD_AUDIO',
+      'android.permission.ACCESS_FINE_LOCATION',
+      'android.permission.ACCESS_COARSE_LOCATION',
+    ],
   },
 
   web: {
@@ -57,9 +86,20 @@ const config: ExpoConfig = {
     lang: 'en',
     display: 'standalone',
     orientation: 'portrait',
+    favicon: './assets/favicon.png',
   },
 
-  plugins: ['expo-router', 'expo-secure-store'],
+  plugins: [
+    'expo-router',
+    'expo-secure-store',
+    [
+      'expo-image-picker',
+      {
+        photosPermission: 'Choose a profile photo for your player registration.',
+        cameraPermission: 'Take a profile photo for your player registration.',
+      },
+    ],
+  ],
 
   experiments: {
     typedRoutes: true,

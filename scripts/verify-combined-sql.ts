@@ -4,7 +4,7 @@
  * and this runs against the user's real project.
  */
 import { PGlite } from '@electric-sql/pglite';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,12 +65,17 @@ async function build(apply: (db: PGlite) => Promise<void>) {
 }
 
 async function main() {
-  const files = [
-    '20260101000000_init.sql',
-    '20260101000001_rls.sql',
-    '20260101000002_views.sql',
-    '20260101000003_registrations.sql',
-  ];
+  // Read the directory rather than listing files here, so adding a migration
+  // never silently skips this comparison.
+  const files = (await readdir(`${ROOT}/supabase/migrations`))
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
+
+  if (files.length === 0) {
+    console.error('  FAIL  no migrations found');
+    process.exit(1);
+  }
+  console.log(`  comparing ${files.length} migrations against setup-all.sql`);
 
   const separate = await build(async (db) => {
     for (const f of files) {

@@ -89,6 +89,8 @@ export default function RootLayout() {
             <Stack.Screen name="chat/[id]" options={{ title: 'Tournament chat' }} />
             <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
             <Stack.Screen name="profile" options={{ title: 'Your profile' }} />
+            <Stack.Screen name="legal/privacy" options={{ title: 'Privacy policy' }} />
+            <Stack.Screen name="legal/delete-account" options={{ title: 'Delete account' }} />
           </Stack>
         </AuthProvider>
       </QueryClientProvider>
