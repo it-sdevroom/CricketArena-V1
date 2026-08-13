@@ -1,62 +1,171 @@
-import {ScrollView,StyleSheet,Text,View} from 'react-native';
-import {Card,Pill} from '@/components/UI';
-import {C} from '@/constants/theme';
-import {players,teams} from '@/data/demo';
+import { useQuery } from '@tanstack/react-query';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+
+import { Card, EmptyState, ErrorNotice, ListRow, Loading, Screen, Segmented } from '@/components/UI';
+import { C } from '@/constants/theme';
+import { stats, tournaments } from '@/src/data/repo';
+import { formatOvers } from '@/src/domain/scoring';
+import { describeError } from '@/src/lib/supabase';
+
+type Board = 'batting' | 'bowling';
 
 export default function Stats() {
+  const [board, setBoard] = useState<Board>('batting');
+  const [tournamentId, setTournamentId] = useState<string | null>(null);
+
+  const leagues = useQuery({ queryKey: ['tournaments'], queryFn: () => tournaments.list() });
+
+  const batting = useQuery({
+    queryKey: ['batting-leaders', tournamentId],
+    queryFn: () => stats.battingLeaders({ tournamentId: tournamentId ?? undefined, limit: 30 }),
+    enabled: board === 'batting',
+  });
+
+  const bowling = useQuery({
+    queryKey: ['bowling-leaders', tournamentId],
+    queryFn: () => stats.bowlingLeaders({ tournamentId: tournamentId ?? undefined, limit: 30 }),
+    enabled: board === 'bowling',
+  });
+
+  const active = board === 'batting' ? batting : bowling;
+
   return (
-    <ScrollView contentContainerStyle={s.p}>
+    <Screen refreshing={active.isFetching} onRefresh={() => void active.refetch()}>
       <Text style={s.title}>Statistics</Text>
-      <Text style={s.sub}>Leaders and tournament rankings</Text>
 
-      <Text style={s.h}>Top run scorers</Text>
-      {[...players].sort((a,b)=>b.runs-a.runs).slice(0,5).map((p,i)=>(
-        <Card style={s.line} key={p.id}>
-          <Text style={s.rank}>{i + 1}</Text>
-          <View style={s.grow}>
-            <Text style={s.name}>{p.name}</Text>
-            <Text style={s.meta}>{p.team} - {p.role} - SR {p.strikeRate}</Text>
+      <Segmented
+        value={board}
+        onChange={setBoard}
+        options={[
+          { value: 'batting', label: 'Most runs' },
+          { value: 'bowling', label: 'Most wickets' },
+        ]}
+      />
+
+      {leagues.data && leagues.data.length > 1 ? (
+        <View style={s.filterRow}>
+          <Segmented
+            value={tournamentId ?? 'all'}
+            onChange={(next) => setTournamentId(next === 'all' ? null : next)}
+            options={[
+              { value: 'all', label: 'All' },
+              ...leagues.data.slice(0, 2).map((t) => ({ value: t.id, label: t.name.split(' ')[0] })),
+            ]}
+          />
+        </View>
+      ) : null}
+
+      {active.error ? (
+        <ErrorNotice message={describeError(active.error)} onRetry={() => void active.refetch()} />
+      ) : active.isLoading ? (
+        <Loading />
+      ) : board === 'batting' ? (
+        <BattingBoard rows={batting.data ?? []} />
+      ) : (
+        <BowlingBoard rows={bowling.data ?? []} />
+      )}
+    </Screen>
+  );
+}
+
+function BattingBoard({ rows }: { rows: Awaited<ReturnType<typeof stats.battingLeaders>> }) {
+  if (!rows.length) {
+    return (
+      <EmptyState
+        icon="bar-chart-outline"
+        title="No batting figures yet"
+        message="Leaderboards build themselves from every ball scored, so they fill in as soon as a match is played."
+      />
+    );
+  }
+
+  return (
+    <Card style={s.board}>
+      <View style={s.headerRow}>
+        <Text style={[s.headerCell, s.playerCol]}>PLAYER</Text>
+        <Text style={s.headerCell}>RUNS</Text>
+        <Text style={s.headerCell}>AVG</Text>
+        <Text style={s.headerCell}>SR</Text>
+      </View>
+      {rows.map((row, index) => (
+        <View key={`${row.player_id}-${row.tournament_id}`} style={s.dataRow}>
+          <Text style={s.rank}>{index + 1}</Text>
+          <View style={s.playerCol}>
+            <Text style={s.player} numberOfLines={1} onPress={() => router.push(`/player/${row.player_id}`)}>
+              {row.full_name}
+            </Text>
+            <Text style={s.sub}>
+              {row.innings} inn • HS {row.high_score} • {row.fours}×4 {row.sixes}×6
+            </Text>
           </View>
-          <Text style={s.value}>{p.runs}</Text>
-        </Card>
-      ))}
-
-      <Text style={s.h}>Top wicket takers</Text>
-      {[...players].sort((a,b)=>b.wickets-a.wickets).slice(0,5).map((p,i)=>(
-        <Card style={s.line} key={p.id}>
-          <Text style={s.rank}>{i + 1}</Text>
-          <View style={s.grow}>
-            <Text style={s.name}>{p.name}</Text>
-            <Text style={s.meta}>{p.team} - economy {p.economy}</Text>
-          </View>
-          <Text style={s.value}>{p.wickets}</Text>
-        </Card>
-      ))}
-
-      <Text style={s.h}>Standings</Text>
-      {teams.map((t,i)=>(
-        <View style={s.stand} key={t.id}>
-          <Text style={s.rank}>{i + 1}</Text>
-          <Text style={s.name}>{t.name}</Text>
-          <Text style={s.nrr}>NRR {t.nrr}</Text>
-          <Pill text={`${t.pts} PTS`}/>
+          <Text style={s.value}>{row.runs}</Text>
+          <Text style={s.cell}>{row.average != null ? row.average.toFixed(1) : '—'}</Text>
+          <Text style={s.cell}>{row.strike_rate.toFixed(0)}</Text>
         </View>
       ))}
-    </ScrollView>
+    </Card>
+  );
+}
+
+function BowlingBoard({ rows }: { rows: Awaited<ReturnType<typeof stats.bowlingLeaders>> }) {
+  if (!rows.length) {
+    return (
+      <EmptyState
+        icon="bar-chart-outline"
+        title="No bowling figures yet"
+        message="Wickets, economy and averages are derived from the ball-by-ball record."
+      />
+    );
+  }
+
+  return (
+    <Card style={s.board}>
+      <View style={s.headerRow}>
+        <Text style={[s.headerCell, s.playerCol]}>PLAYER</Text>
+        <Text style={s.headerCell}>WKTS</Text>
+        <Text style={s.headerCell}>ECON</Text>
+        <Text style={s.headerCell}>AVG</Text>
+      </View>
+      {rows.map((row, index) => (
+        <View key={`${row.player_id}-${row.tournament_id}`} style={s.dataRow}>
+          <Text style={s.rank}>{index + 1}</Text>
+          <View style={s.playerCol}>
+            <Text style={s.player} numberOfLines={1} onPress={() => router.push(`/player/${row.player_id}`)}>
+              {row.full_name}
+            </Text>
+            <Text style={s.sub}>
+              {formatOvers(row.legal_balls)} ov • best {row.best_wickets} • {row.maidens} mdn
+            </Text>
+          </View>
+          <Text style={s.value}>{row.wickets}</Text>
+          <Text style={s.cell}>{row.economy.toFixed(1)}</Text>
+          <Text style={s.cell}>{row.average != null ? row.average.toFixed(1) : '—'}</Text>
+        </View>
+      ))}
+    </Card>
   );
 }
 
 const s = StyleSheet.create({
-  p:{padding:18,paddingTop:60,paddingBottom:110,backgroundColor:C.bg},
-  title:{fontSize:30,fontWeight:'900',color:C.white},
-  sub:{color:C.muted,marginTop:5},
-  h:{color:C.white,fontSize:20,fontWeight:'900',marginTop:24,marginBottom:12},
-  line:{flexDirection:'row',alignItems:'center',marginBottom:8,padding:13},
-  rank:{color:C.muted,fontWeight:'900',width:30},
-  grow:{flex:1},
-  name:{color:C.white,fontWeight:'800',flex:1},
-  meta:{color:C.muted,fontSize:12,marginTop:3},
-  value:{color:C.lime,fontWeight:'900',fontSize:20},
-  stand:{flexDirection:'row',alignItems:'center',paddingVertical:14,borderBottomColor:C.line,borderBottomWidth:1,gap:10},
-  nrr:{color:C.muted,fontSize:12},
+  title: { color: C.white, fontSize: 26, fontWeight: '900', marginTop: 34, marginBottom: 18 },
+  filterRow: { marginTop: 10 },
+  board: { marginTop: 18, paddingHorizontal: 12 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', paddingBottom: 10, gap: 6 },
+  headerCell: { color: C.muted, fontSize: 10, fontWeight: '900', width: 46, textAlign: 'right', letterSpacing: 0.6 },
+  playerCol: { flex: 1, textAlign: 'left' },
+  dataRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    borderTopWidth: 1,
+    borderTopColor: C.line,
+  },
+  rank: { color: C.muted, width: 20, fontWeight: '800', fontSize: 12 },
+  player: { color: C.white, fontWeight: '800' },
+  sub: { color: C.muted, fontSize: 11, marginTop: 3 },
+  value: { color: C.lime, fontWeight: '900', width: 46, textAlign: 'right' },
+  cell: { color: C.white, width: 46, textAlign: 'right', fontSize: 13 },
 });

@@ -1,41 +1,126 @@
-import {ScrollView,StyleSheet,Text,View} from 'react-native';
-import {Ionicons} from '@expo/vector-icons';
-import {Card,Pill} from '@/components/UI';
-import {C} from '@/constants/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-const notifications = [
-  ['radio','Match 12 is live','Riyadh Falcons won the toss and elected to bat.','NOW'],
-  ['trophy','Result published','Desert Warriors won Match 10 by 18 runs.','2H'],
-  ['calendar','Fixture updated','Tomorrow match will begin at 5:00 PM.','5H'],
-  ['people','Player registration','Two registrations await organizer approval.','1D'],
-];
+import { Button, Card, EmptyState, Loading, Screen } from '@/components/UI';
+import { C } from '@/constants/theme';
+import { notifications } from '@/src/data/repo';
+import { useAuth } from '@/src/store/auth';
+
+const ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  match_start: 'play-circle-outline',
+  result: 'trophy-outline',
+  fixture: 'calendar-outline',
+  general: 'information-circle-outline',
+};
 
 export default function Notifications() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ['notifications', user?.id],
+    queryFn: () => notifications.list(user!.id),
+    enabled: !!user,
+  });
+
+  if (!user) {
+    return (
+      <Screen>
+        <EmptyState
+          icon="notifications-off-outline"
+          title="Sign in for notifications"
+          message="We will tell you when your team is playing, when a match starts and when a result is in."
+          actionLabel="Sign in"
+          onAction={() => router.push('/(auth)/sign-in')}
+        />
+      </Screen>
+    );
+  }
+
+  const unread = query.data?.filter((n) => !n.read_at) ?? [];
+
+  const markAll = async () => {
+    await notifications.markAllRead(user.id);
+    await queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
+  };
+
   return (
-    <ScrollView contentContainerStyle={s.p}>
-      <Text style={s.title}>Notifications</Text>
-      <Text style={s.sub}>Match, team and organizer alerts</Text>
-      {notifications.map((x,i)=>(
-        <Card style={s.item} key={x[1]}>
-          <View style={s.icon}><Ionicons name={x[0] as any} color={C.green} size={22}/></View>
-          <View style={s.grow}>
-            <Text style={s.name}>{x[1]}</Text>
-            <Text style={s.meta}>{x[2]}</Text>
-          </View>
-          <Pill text={x[3]} tone={i === 0 ? 'red' : 'green'}/>
-        </Card>
-      ))}
-    </ScrollView>
+    <Screen refreshing={query.isFetching} onRefresh={() => void query.refetch()}>
+      {unread.length ? (
+        <Button title={`Mark all ${unread.length} as read`} secondary onPress={markAll} style={s.markAll} />
+      ) : null}
+
+      {query.isLoading ? (
+        <Loading />
+      ) : query.data?.length ? (
+        query.data.map((item) => (
+          <Pressable
+            key={item.id}
+            onPress={async () => {
+              if (!item.read_at) {
+                await notifications.markRead(item.id);
+                await queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
+              }
+              if (item.match_id) router.push(`/match/${item.match_id}`);
+              else if (item.tournament_id) router.push(`/tournament/${item.tournament_id}`);
+            }}
+            style={({ pressed }) => pressed && s.pressed}
+          >
+            <Card style={[s.item, !item.read_at && s.unread]}>
+              <View style={s.icon}>
+                <Ionicons name={ICONS[item.kind] ?? ICONS.general} size={18} color={C.green} />
+              </View>
+              <View style={s.flex}>
+                <Text style={s.title} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                {item.body ? (
+                  <Text style={s.body} numberOfLines={2}>
+                    {item.body}
+                  </Text>
+                ) : null}
+                <Text style={s.time}>
+                  {new Date(item.created_at).toLocaleDateString(undefined, {
+                    day: 'numeric',
+                    month: 'short',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                </Text>
+              </View>
+              {!item.read_at ? <View style={s.dot} /> : null}
+            </Card>
+          </Pressable>
+        ))
+      ) : (
+        <EmptyState
+          icon="notifications-outline"
+          title="Nothing yet"
+          message="Match reminders and results will land here."
+        />
+      )}
+    </Screen>
   );
 }
 
 const s = StyleSheet.create({
-  p:{padding:18,paddingBottom:50,backgroundColor:C.bg},
-  title:{color:C.white,fontSize:29,fontWeight:'900'},
-  sub:{color:C.muted,marginTop:5,marginBottom:18},
-  item:{flexDirection:'row',gap:12,alignItems:'center',marginBottom:9},
-  icon:{width:43,height:43,borderRadius:14,backgroundColor:C.green+'15',alignItems:'center',justifyContent:'center'},
-  grow:{flex:1},
-  name:{color:C.white,fontWeight:'900'},
-  meta:{color:C.muted,fontSize:12,marginTop:4,lineHeight:17},
+  flex: { flex: 1 },
+  markAll: { marginBottom: 16 },
+  pressed: { opacity: 0.8 },
+  item: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 9 },
+  unread: { borderColor: `${C.green}66` },
+  icon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: C.card2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: { color: C.white, fontWeight: '800' },
+  body: { color: C.muted, fontSize: 12, marginTop: 4, lineHeight: 17 },
+  time: { color: C.muted, fontSize: 11, marginTop: 6 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.green },
 });

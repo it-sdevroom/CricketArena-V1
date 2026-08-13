@@ -1,0 +1,94 @@
+name: Deploy to GitHub Pages
+
+# Builds the web version and publishes it to GitHub Pages on every push to the
+# default branch. Set the two Supabase values as repository secrets first:
+#
+#   Settings -> Secrets and variables -> Actions -> New repository secret
+#     EXPO_PUBLIC_SUPABASE_URL
+#     EXPO_PUBLIC_SUPABASE_ANON_KEY
+#
+# Then enable Pages with "GitHub Actions" as the source:
+#   Settings -> Pages -> Build and deployment -> Source: GitHub Actions
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it half-published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Cricket rules unit tests
+        run: npm test
+
+      - name: Database schema and views
+        run: npm run verify:schema
+
+  build:
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Export the web build
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          # Pages serves a project site from /<repo>, so the bundle needs to
+          # know its own base path. A user or org site (<name>.github.io) is
+          # served from the root and needs no prefix.
+          EXPO_PUBLIC_BASE_URL: ${{ endsWith(github.repository, '.github.io') && '' || format('/{0}', github.event.repository.name) }}
+        run: npx expo export --platform web --output-dir dist
+
+      - name: Add SPA fallback and disable Jekyll
+        run: |
+          # Pages has no rewrite rules, so a deep link such as /match/<id> would
+          # 404. Serving the same shell as 404.html lets the router take over.
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

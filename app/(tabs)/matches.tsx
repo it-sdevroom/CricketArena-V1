@@ -1,41 +1,84 @@
-import {ScrollView,StyleSheet,Text,View} from 'react-native';
-import {router} from 'expo-router';
-import {Button,Card,Pill} from '@/components/UI';
-import {C} from '@/constants/theme';
-import {fixtures} from '@/data/demo';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { StyleSheet, Text } from 'react-native';
+
+import { MatchCard } from '@/components/MatchCard';
+import { EmptyState, ErrorNotice, Loading, Screen, Segmented } from '@/components/UI';
+import { C } from '@/constants/theme';
+import { matches } from '@/src/data/repo';
+import { describeError } from '@/src/lib/supabase';
+
+type Filter = 'live' | 'upcoming' | 'results';
+
+const STATUS: Record<Filter, string[]> = {
+  live: ['live', 'innings_break', 'toss'],
+  upcoming: ['scheduled'],
+  results: ['completed', 'walkover', 'abandoned'],
+};
 
 export default function Matches() {
+  const [filter, setFilter] = useState<Filter>('live');
+
+  const query = useQuery({
+    queryKey: ['matches', filter],
+    queryFn: () => matches.summaries({ status: STATUS[filter], limit: 60 }),
+  });
+
+  const list = query.data ?? [];
+  // Results read best newest first; fixtures read best soonest first.
+  const ordered =
+    filter === 'results'
+      ? [...list].sort((a, z) => (z.scheduled_at ?? '').localeCompare(a.scheduled_at ?? ''))
+      : list;
+
   return (
-    <ScrollView contentContainerStyle={s.p}>
-      <Text style={s.title}>Match center</Text>
-      <Text style={s.sub}>Live, upcoming and completed fixtures</Text>
-      {fixtures.map(f=>(
-        <Card key={f.id} style={s.card}>
-          <View style={s.row}>
-            <Pill text={f.live ? 'LIVE' : 'UPCOMING'} tone={f.live ? 'red' : 'green'}/>
-            <Text style={s.date}>{f.date}</Text>
-          </View>
-          <Text style={s.stage}>{f.stage}</Text>
-          <Text style={s.teams}>{f.a} <Text style={s.dim}>vs</Text> {f.b}</Text>
-          <Text style={s.venue}>{f.venue}</Text>
-          <Text style={s.status}>{f.status}</Text>
-          {f.live && <Button title="Score this match" onPress={()=>router.push('/scorer')}/>}
-        </Card>
-      ))}
-    </ScrollView>
+    <Screen refreshing={query.isFetching} onRefresh={() => void query.refetch()}>
+      <Text style={s.title}>Matches</Text>
+
+      <Segmented
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { value: 'live', label: 'Live' },
+          { value: 'upcoming', label: 'Fixtures' },
+          { value: 'results', label: 'Results' },
+        ]}
+      />
+
+      <Text style={s.count}>
+        {query.isLoading ? ' ' : `${ordered.length} match${ordered.length === 1 ? '' : 'es'}`}
+      </Text>
+
+      {query.error ? (
+        <ErrorNotice message={describeError(query.error)} onRetry={() => void query.refetch()} />
+      ) : query.isLoading ? (
+        <Loading />
+      ) : ordered.length ? (
+        ordered.map((match) => <MatchCard key={match.match_id} match={match} />)
+      ) : (
+        <EmptyState
+          icon={filter === 'live' ? 'radio-outline' : filter === 'upcoming' ? 'calendar-outline' : 'trophy-outline'}
+          title={
+            filter === 'live'
+              ? 'Nothing live right now'
+              : filter === 'upcoming'
+                ? 'No fixtures scheduled'
+                : 'No completed matches yet'
+          }
+          message={
+            filter === 'live'
+              ? 'When a scorer opens the console and records the first ball, the match appears here instantly.'
+              : filter === 'upcoming'
+                ? 'Generate a fixture list from the organiser console to fill this in.'
+                : 'Results are published the moment a match is completed.'
+          }
+        />
+      )}
+    </Screen>
   );
 }
 
 const s = StyleSheet.create({
-  p:{padding:18,paddingTop:60,paddingBottom:110,backgroundColor:C.bg},
-  title:{fontSize:30,fontWeight:'900',color:C.white},
-  sub:{color:C.muted,marginTop:5,marginBottom:20},
-  card:{marginBottom:12},
-  row:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},
-  date:{color:C.muted},
-  stage:{color:C.green,fontWeight:'900',fontSize:12,marginTop:18},
-  teams:{fontSize:23,fontWeight:'900',color:C.white,marginTop:8,marginBottom:8},
-  dim:{color:C.muted},
-  venue:{color:C.muted,marginBottom:8},
-  status:{color:C.amber,fontWeight:'800',marginBottom:16},
+  title: { color: C.white, fontSize: 26, fontWeight: '900', marginTop: 34, marginBottom: 18 },
+  count: { color: C.muted, fontSize: 12, marginTop: 16, marginBottom: 12 },
 });
