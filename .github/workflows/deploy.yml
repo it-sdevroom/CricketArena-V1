@@ -66,8 +66,13 @@ jobs:
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
           # Pages serves a project site from /<repo>, so the bundle needs to
           # know its own base path. A user or org site (<name>.github.io) is
-          # served from the root and needs no prefix.
-          EXPO_PUBLIC_BASE_URL: ${{ endsWith(github.repository, '.github.io') && '' || format('/{0}', github.event.repository.name) }}
+          # served from the root instead.
+          #
+          # The truthy branch is "/" rather than "": GitHub's `a && b || c` is
+          # not a real ternary, and an empty string is falsy, so it would fall
+          # through to the repository name for user sites. app.config.ts treats
+          # a bare "/" as no base path.
+          EXPO_PUBLIC_BASE_URL: ${{ endsWith(github.repository, '.github.io') && '/' || format('/{0}', github.event.repository.name) }}
         run: npx expo export --platform web --output-dir dist
 
       - name: Add SPA fallback and disable Jekyll

@@ -13,7 +13,10 @@ import type { ExpoConfig } from 'expo/config';
  * correct bundle in both places without anyone editing a config by hand.
  */
 
-const baseUrl = process.env.EXPO_PUBLIC_BASE_URL?.trim() || undefined;
+// A bare "/" means "served from the root" and must become undefined, not "/".
+// The deploy workflow sends "/" for user and organisation Pages sites.
+const rawBaseUrl = process.env.EXPO_PUBLIC_BASE_URL?.trim();
+const baseUrl = !rawBaseUrl || rawBaseUrl === '/' ? undefined : rawBaseUrl.replace(/\/$/, '');
 
 const config: ExpoConfig = {
   name: 'Cricket Arena',
