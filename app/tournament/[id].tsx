@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
+import { FollowButton } from '@/components/FollowButton';
 import { MatchCard } from '@/components/MatchCard';
 import {
   Button,
@@ -116,6 +117,9 @@ export default function TournamentDetail() {
           <Pill text={`${t.overs_per_innings ?? '∞'} overs`} tone="muted" />
           <Pill text={`${entrants.data?.length ?? 0} teams`} tone="muted" />
           <Pill text={`${fixtures.data?.length ?? 0} fixtures`} tone="muted" />
+        </View>
+        <View style={s.followRow}>
+          <FollowButton target={{ tournamentId: t.id }} />
         </View>
       </Card>
 
@@ -301,6 +305,7 @@ const s = StyleSheet.create({
   name: { color: C.white, fontWeight: '900', fontSize: 22 },
   description: { color: C.muted, lineHeight: 20, fontSize: 13 },
   chips: { flexDirection: 'row', gap: 7, flexWrap: 'wrap', marginTop: 6 },
+  followRow: { flexDirection: 'row', marginTop: 6 },
   adminActions: { gap: 10, marginTop: 14 },
   tabs: { marginTop: 20, marginBottom: 18 },
 

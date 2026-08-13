@@ -82,6 +82,10 @@ export default function RootLayout() {
             <Stack.Screen name="organizer/index" options={{ title: 'Organiser console' }} />
             <Stack.Screen name="organizer/new-tournament" options={{ title: 'New tournament' }} />
             <Stack.Screen name="organizer/squads" options={{ title: 'Teams & players' }} />
+            <Stack.Screen name="organizer/approvals" options={{ title: 'Player registrations' }} />
+            <Stack.Screen name="organizer/officials" options={{ title: 'Scorers & umpires' }} />
+            <Stack.Screen name="join-team" options={{ title: 'Register as a player' }} />
+            <Stack.Screen name="following" options={{ title: 'Following' }} />
             <Stack.Screen name="chat/[id]" options={{ title: 'Tournament chat' }} />
             <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
             <Stack.Screen name="profile" options={{ title: 'Your profile' }} />

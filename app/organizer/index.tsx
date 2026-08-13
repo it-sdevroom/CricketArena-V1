@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, EmptyState, ErrorNotice, Input, Loading, Pill, Screen, Section } from '@/components/UI';
 import { C } from '@/constants/theme';
-import { matches, organizations, tournaments } from '@/src/data/repo';
+import { matches, organizations, registrations, tournaments } from '@/src/data/repo';
 import { useAuth } from '@/src/store/auth';
 import { describeError } from '@/src/lib/supabase';
 
@@ -29,6 +29,13 @@ export default function OrganizerConsole() {
     queryKey: ['org-live', activeOrg?.id],
     queryFn: () => matches.summaries({ organizationId: activeOrg?.id, status: ['live', 'toss', 'innings_break'] }),
     enabled: !!activeOrg,
+  });
+
+  // Surfaced on the button below so a waiting applicant is not left hanging.
+  const waiting = useQuery({
+    queryKey: ['registrations-count', activeOrg?.id],
+    queryFn: () => registrations.pendingCount(activeOrg!.id),
+    enabled: !!activeOrg && can.manageTournaments,
   });
 
   if (!user) {
@@ -120,6 +127,24 @@ export default function OrganizerConsole() {
           secondary
           icon="people-outline"
           onPress={() => router.push('/organizer/squads')}
+          style={s.spaced}
+        />
+        <Button
+          title={
+            waiting.data
+              ? `Player registrations (${waiting.data} waiting)`
+              : 'Player registrations'
+          }
+          secondary={!waiting.data}
+          icon="checkmark-done-outline"
+          onPress={() => router.push('/organizer/approvals')}
+          style={s.spaced}
+        />
+        <Button
+          title="Scorers & umpires"
+          secondary
+          icon="clipboard-outline"
+          onPress={() => router.push('/organizer/officials')}
           style={s.spaced}
         />
       </Section>

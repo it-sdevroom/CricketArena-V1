@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { FollowButton } from '@/components/FollowButton';
 import { Card, EmptyState, ErrorNotice, Loading, Pill, Screen, Section, StatTile } from '@/components/UI';
 import { C } from '@/constants/theme';
 import { players, stats } from '@/src/data/repo';
@@ -83,6 +84,7 @@ export default function PlayerDetail() {
             <Pill text={p.bowling_style.replace(/_/g, ' ').toUpperCase()} tone="blue" />
           ) : null}
         </View>
+        <FollowButton target={{ playerId: p.id }} />
       </Card>
 
       {!hasPlayed ? (

@@ -4,6 +4,10 @@ dist/
 web-build/
 .expo-shared/
 
+# Left over from the earlier Codex hosting flow.
+work/
+.codex-gitconfig
+
 # Secrets. .env.example is committed; .env is not.
 .env
 .env.local

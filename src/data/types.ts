@@ -399,6 +399,41 @@ export interface MessageRow {
   created_at: string;
 }
 
+export type RegistrationStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
+
+/** A cricketer's application to join a squad, awaiting an organiser's decision. */
+export interface RegistrationRow {
+  id: string;
+  organization_id: string;
+  team_id: string;
+  tournament_id: string | null;
+  user_id: string;
+  player_id: string | null;
+  full_name: string;
+  display_name: string | null;
+  jersey_number: number | null;
+  date_of_birth: string | null;
+  phone: string | null;
+  photo_url: string | null;
+  role: PlayerRole;
+  batting_style: 'right_hand' | 'left_hand';
+  bowling_style: string;
+  note: string | null;
+  status: RegistrationStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  created_at: string;
+}
+
+export interface FollowRow {
+  user_id: string;
+  team_id: string | null;
+  tournament_id: string | null;
+  player_id: string | null;
+  created_at: string;
+}
+
 export interface NotificationRow {
   id: string;
   user_id: string;

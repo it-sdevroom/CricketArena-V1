@@ -107,6 +107,21 @@ export default function More() {
         </Section>
       ) : null}
 
+      <Section title="For players and fans">
+        <MenuItem
+          icon="person-add-outline"
+          label="Register as a player"
+          detail="Join a squad — an organiser confirms you"
+          onPress={() => router.push('/join-team')}
+        />
+        <MenuItem
+          icon="heart-outline"
+          label="Following"
+          detail="Your teams, competitions and players"
+          onPress={() => router.push('/following')}
+        />
+      </Section>
+
       <Section title="Manage">
         <MenuItem
           icon="construct-outline"
@@ -114,6 +129,22 @@ export default function More() {
           detail="Competitions, squads, officials"
           onPress={() => router.push('/organizer')}
         />
+        {can.manageTournaments ? (
+          <>
+            <MenuItem
+              icon="checkmark-done-outline"
+              label="Player registrations"
+              detail="Approve people applying to join a squad"
+              onPress={() => router.push('/organizer/approvals')}
+            />
+            <MenuItem
+              icon="clipboard-outline"
+              label="Scorers & umpires"
+              detail="Appoint officials to a fixture"
+              onPress={() => router.push('/organizer/officials')}
+            />
+          </>
+        ) : null}
         {can.manageSquads ? (
           <MenuItem
             icon="people-outline"

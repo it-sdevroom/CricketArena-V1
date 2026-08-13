@@ -51,6 +51,37 @@ begin
 end $$;
 
 create publication supabase_realtime;
+
+-- Supabase Storage. Only the pieces the migrations touch.
+create schema if not exists storage;
+
+create table if not exists storage.buckets (
+  id text primary key,
+  name text not null,
+  public boolean not null default false,
+  file_size_limit bigint,
+  allowed_mime_types text[],
+  created_at timestamptz not null default now()
+);
+
+create table if not exists storage.objects (
+  id uuid primary key default gen_random_uuid(),
+  bucket_id text references storage.buckets (id),
+  name text,
+  owner uuid,
+  created_at timestamptz not null default now()
+);
+
+alter table storage.objects enable row level security;
+
+-- Splits an object path into its folder segments, as the real Storage does.
+create or replace function storage.foldername(name text)
+returns text[]
+language sql
+immutable
+as $$
+  select string_to_array(regexp_replace(name, '/[^/]*$', ''), '/');
+$$;
 `;
 
 function fail(message: string, detail?: unknown): never {
@@ -215,6 +246,38 @@ async function main() {
       expect: (r) => (r[0].n === 0 ? null : `${r[0].n} overs were bowled back to back`),
     },
     {
+      label: 'the avatars bucket exists and is public',
+      sql: "select public from storage.buckets where id = 'avatars'",
+      expect: (r) => (r[0]?.public === true ? null : 'avatars bucket missing or not public'),
+    },
+    {
+      label: 'a user can only write inside their own avatar folder',
+      sql: `select (storage.foldername('abc-123/photo.jpg'))[1] as folder`,
+      expect: (r) => (r[0].folder === 'abc-123' ? null : `folder resolved to ${r[0].folder}`),
+    },
+    {
+      label: 'approve_registration and reject_registration exist',
+      sql: `select count(*)::int as n from pg_proc
+            where proname in ('approve_registration','reject_registration')`,
+      expect: (r) => (r[0].n === 2 ? null : `expected 2 functions, found ${r[0].n}`),
+    },
+    {
+      label: 'approval runs as definer so it can write the roster',
+      sql: `select prosecdef from pg_proc where proname = 'approve_registration'`,
+      expect: (r) => (r[0].prosecdef === true ? null : 'approve_registration is not SECURITY DEFINER'),
+    },
+    {
+      label: 'only one pending application per person per team',
+      sql: `select count(*)::int as n from pg_indexes
+            where indexname = 'one_pending_application'`,
+      expect: (r) => (r[0].n === 1 ? null : 'the partial unique index is missing'),
+    },
+    {
+      label: 'a follow points at exactly one thing',
+      sql: `select count(*)::int as n from pg_constraint where conname = 'one_target'`,
+      expect: (r) => (r[0].n === 1 ? null : 'the one_target check constraint is missing'),
+    },
+    {
       label: 'RLS is enabled on every application table',
       sql: `
         select count(*)::int as n
@@ -241,6 +304,145 @@ async function main() {
       console.error(error);
       failures += 1;
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Walk a player registration all the way through approval.
+  // -------------------------------------------------------------------------
+
+  console.log('\n  Player registration flow:');
+  try {
+    // An organiser, and a cricketer who wants to join one of their teams.
+    await db.exec(`
+      insert into auth.users (id, email) values
+        ('11111111-1111-1111-1111-111111111111', 'organiser@example.com'),
+        ('22222222-2222-2222-2222-222222222222', 'player@example.com');
+      update profiles set is_platform_admin = true
+        where id = '11111111-1111-1111-1111-111111111111';
+      update profiles set full_name = 'Hopeful Cricketer'
+        where id = '22222222-2222-2222-2222-222222222222';
+    `);
+
+    const team = await db.query<any>(`select id, organization_id from teams limit 1`);
+    const { id: teamId, organization_id: orgId } = team.rows[0];
+
+    // Give the organiser the role they would really hold.
+    await db.query(
+      `insert into organization_members (organization_id, user_id, role)
+       values ($1, '11111111-1111-1111-1111-111111111111', 'tournament_admin')
+       on conflict do nothing`,
+      [orgId],
+    );
+
+    // Act as the applicant.
+    await db.exec(`set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222'`);
+    const application = await db.query<any>(
+      `insert into player_registrations
+         (organization_id, team_id, user_id, full_name, jersey_number, role, note)
+       values ($1, $2, '22222222-2222-2222-2222-222222222222', 'Hopeful Cricketer', 77,
+               'all_rounder', 'I keep wicket too.')
+       returning id`,
+      [orgId, teamId],
+    );
+    const applicationId = application.rows[0].id;
+    console.log('  ok    a signed-in user can apply to join a squad');
+
+    // A second pending application to the same team must be refused.
+    let blocked = false;
+    try {
+      await db.query(
+        `insert into player_registrations (organization_id, team_id, user_id, full_name)
+         values ($1, $2, '22222222-2222-2222-2222-222222222222', 'Hopeful Cricketer')`,
+        [orgId, teamId],
+      );
+    } catch {
+      blocked = true;
+    }
+    console.log(
+      blocked
+        ? '  ok    a duplicate pending application is refused'
+        : '  FAIL  a duplicate pending application was allowed',
+    );
+    if (!blocked) failures += 1;
+
+    // The organiser was told.
+    const alerted = await db.query<any>(
+      `select count(*)::int as n from notifications
+       where user_id = '11111111-1111-1111-1111-111111111111' and kind = 'registration'`,
+    );
+    console.log(
+      alerted.rows[0].n > 0
+        ? '  ok    the organiser is notified of the application'
+        : '  FAIL  no notification reached the organiser',
+    );
+    if (alerted.rows[0].n === 0) failures += 1;
+
+    // A non-admin must not be able to approve it.
+    await db.exec(`set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222'`);
+    let refused = false;
+    try {
+      await db.query(`select approve_registration($1)`, [applicationId]);
+    } catch {
+      refused = true;
+    }
+    console.log(
+      refused
+        ? '  ok    an applicant cannot approve their own registration'
+        : '  FAIL  self-approval was allowed',
+    );
+    if (!refused) failures += 1;
+
+    // Now the organiser approves.
+    await db.exec(`set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111'`);
+    await db.query(`select approve_registration($1, 'Welcome aboard')`, [applicationId]);
+
+    const outcome = await db.query<any>(
+      `select r.status, r.player_id, p.full_name, p.user_id,
+              (select count(*)::int from team_members tm
+                where tm.team_id = r.team_id and tm.player_id = r.player_id) as in_squad,
+              (select count(*)::int from organization_members om
+                where om.organization_id = r.organization_id and om.user_id = r.user_id) as is_member,
+              (select count(*)::int from notifications n
+                where n.user_id = r.user_id and n.kind = 'registration') as told
+       from player_registrations r
+       left join players p on p.id = r.player_id
+       where r.id = $1`,
+      [applicationId],
+    );
+    const row = outcome.rows[0];
+
+    const expectations: [string, boolean][] = [
+      ['the application is marked approved', row.status === 'approved'],
+      ['a roster entry was created', !!row.player_id && row.full_name === 'Hopeful Cricketer'],
+      ['the roster entry is linked to their account', row.user_id === '22222222-2222-2222-2222-222222222222'],
+      ['they were added to the squad', row.in_squad === 1],
+      ['they gained a role in the organisation', row.is_member === 1],
+      ['the applicant was told the outcome', row.told > 0],
+    ];
+    for (const [label, ok] of expectations) {
+      console.log(ok ? `  ok    ${label}` : `  FAIL  ${label}`);
+      if (!ok) failures += 1;
+    }
+
+    // Approving twice must not create a second player.
+    let secondRefused = false;
+    try {
+      await db.query(`select approve_registration($1)`, [applicationId]);
+    } catch {
+      secondRefused = true;
+    }
+    console.log(
+      secondRefused
+        ? '  ok    an already-approved registration cannot be approved again'
+        : '  FAIL  double approval was allowed',
+    );
+    if (!secondRefused) failures += 1;
+
+    await db.exec(`reset request.jwt.claim.sub`);
+  } catch (error) {
+    console.error('  FAIL  registration flow');
+    console.error(error);
+    failures += 1;
   }
 
   // -------------------------------------------------------------------------

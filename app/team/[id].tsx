@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Card, EmptyState, ErrorNotice, ListRow, Loading, Pill, Screen, Section } from '@/components/UI';
+import { FollowButton } from '@/components/FollowButton';
+import { Button, Card, EmptyState, ErrorNotice, ListRow, Loading, Pill, Screen, Section } from '@/components/UI';
 import { C } from '@/constants/theme';
 import { teams } from '@/src/data/repo';
 
@@ -37,7 +38,16 @@ export default function TeamDetail() {
           {captain ? <Pill text={`Captain: ${captain.full_name.split(' ')[0]}`} tone="green" /> : null}
           {keepers.length ? <Pill text={`${keepers.length} keeper`} tone="muted" /> : null}
         </View>
+        <FollowButton target={{ teamId: t.id }} />
       </Card>
+
+      <Button
+        title="Register to play for this team"
+        secondary
+        icon="person-add-outline"
+        onPress={() => router.push('/join-team')}
+        style={s.join}
+      />
 
       <Section title="Squad">
         {squad.isLoading ? (
@@ -85,4 +95,5 @@ const s = StyleSheet.create({
   crestText: { fontWeight: '900', fontSize: 21 },
   name: { color: C.white, fontWeight: '900', fontSize: 21, textAlign: 'center' },
   chips: { flexDirection: 'row', gap: 7, flexWrap: 'wrap', justifyContent: 'center' },
+  join: { marginTop: 12 },
 });

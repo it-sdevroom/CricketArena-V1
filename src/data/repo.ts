@@ -20,6 +20,7 @@ import type {
   BowlingCardRow,
   BowlingCareerRow,
   DeliveryRow,
+  FollowRow,
   InningsRow,
   MatchRow,
   MatchSummaryRow,
@@ -29,6 +30,7 @@ import type {
   PlayerRow,
   PlayingXiRow,
   ProfileRow,
+  RegistrationRow,
   StandingsRowDb,
   TeamRow,
   TournamentRow,
@@ -145,6 +147,20 @@ export const organizations = {
       .maybeSingle();
     if (error) throw error;
     return (data?.role as AppRole) ?? null;
+  },
+
+  /** Everyone in the organisation, with their profile, for assigning duties. */
+  async members(organizationId: string): Promise<(ProfileRow & { role: AppRole })[]> {
+    const { data, error } = await supabase
+      .from('organization_members')
+      .select('role, profiles(*)')
+      .eq('organization_id', organizationId);
+    if (error) throw error;
+
+    return (data ?? [])
+      .filter((row: any) => row.profiles)
+      .map((row: any) => ({ ...row.profiles, role: row.role as AppRole }))
+      .sort((a: any, z: any) => (a.full_name ?? '').localeCompare(z.full_name ?? ''));
   },
 
   async addMember(organizationId: string, userId: string, role: AppRole) {
@@ -793,6 +809,207 @@ export const chat = {
         .select('*')
         .single(),
     );
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Player self-registration
+// ---------------------------------------------------------------------------
+
+export const registrations = {
+  /** Apply to join a squad. Creates nothing on the real roster until approved. */
+  async apply(input: {
+    organizationId: string;
+    teamId: string;
+    tournamentId?: string | null;
+    userId: string;
+    fullName: string;
+    displayName?: string | null;
+    jerseyNumber?: number | null;
+    dateOfBirth?: string | null;
+    phone?: string | null;
+    photoUrl?: string | null;
+    role: string;
+    battingStyle: string;
+    bowlingStyle: string;
+    note?: string | null;
+  }): Promise<RegistrationRow> {
+    return unwrap(
+      await supabase
+        .from('player_registrations')
+        .insert({
+          organization_id: input.organizationId,
+          team_id: input.teamId,
+          tournament_id: input.tournamentId ?? null,
+          user_id: input.userId,
+          full_name: input.fullName,
+          display_name: input.displayName ?? null,
+          jersey_number: input.jerseyNumber ?? null,
+          date_of_birth: input.dateOfBirth ?? null,
+          phone: input.phone ?? null,
+          photo_url: input.photoUrl ?? null,
+          role: input.role,
+          batting_style: input.battingStyle,
+          bowling_style: input.bowlingStyle,
+          note: input.note ?? null,
+        })
+        .select('*')
+        .single(),
+    );
+  },
+
+  /** Applications this user has sent, newest first. */
+  async mine(userId: string): Promise<(RegistrationRow & { team: TeamRow | null })[]> {
+    const { data, error } = await supabase
+      .from('player_registrations')
+      .select('*, teams(*)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((row: any) => ({ ...row, team: row.teams ?? null }));
+  },
+
+  /** The organiser's queue. */
+  async pending(organizationId: string): Promise<(RegistrationRow & { team: TeamRow | null })[]> {
+    const { data, error } = await supabase
+      .from('player_registrations')
+      .select('*, teams(*)')
+      .eq('organization_id', organizationId)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map((row: any) => ({ ...row, team: row.teams ?? null }));
+  },
+
+  async reviewed(organizationId: string, limit = 30) {
+    const { data, error } = await supabase
+      .from('player_registrations')
+      .select('*, teams(*)')
+      .eq('organization_id', organizationId)
+      .in('status', ['approved', 'rejected'])
+      .order('reviewed_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []).map((row: any) => ({ ...row, team: row.teams ?? null }));
+  },
+
+  /**
+   * Approve an application. This is a database function rather than a series of
+   * writes so creating the player, adding them to the squad and marking the
+   * application either all happen or none do.
+   */
+  async approve(registrationId: string, note?: string): Promise<PlayerRow> {
+    const { data, error } = await supabase.rpc('approve_registration', {
+      registration: registrationId,
+      note: note ?? null,
+    });
+    if (error) throw error;
+    return data as PlayerRow;
+  },
+
+  async reject(registrationId: string, note?: string): Promise<void> {
+    const { error } = await supabase.rpc('reject_registration', {
+      registration: registrationId,
+      note: note ?? null,
+    });
+    if (error) throw error;
+  },
+
+  async withdraw(registrationId: string): Promise<void> {
+    const { error } = await supabase
+      .from('player_registrations')
+      .update({ status: 'withdrawn' })
+      .eq('id', registrationId);
+    if (error) throw error;
+  },
+
+  /** How many are waiting, for the badge on the organiser console. */
+  async pendingCount(organizationId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('player_registrations')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', organizationId)
+      .eq('status', 'pending');
+    if (error) throw error;
+    return count ?? 0;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Following (the fan experience)
+// ---------------------------------------------------------------------------
+
+type FollowTarget = { teamId?: string; tournamentId?: string; playerId?: string };
+
+export const follows = {
+  async list(userId: string): Promise<FollowRow[]> {
+    return unwrap(await supabase.from('follows').select('*').eq('user_id', userId));
+  },
+
+  /** Followed teams with their full rows, for the dashboard. */
+  async teams(userId: string): Promise<TeamRow[]> {
+    const { data, error } = await supabase
+      .from('follows')
+      .select('teams(*)')
+      .eq('user_id', userId)
+      .not('team_id', 'is', null);
+    if (error) throw error;
+    return (data ?? []).map((row: any) => row.teams).filter(Boolean);
+  },
+
+  async tournaments(userId: string): Promise<TournamentRow[]> {
+    const { data, error } = await supabase
+      .from('follows')
+      .select('tournaments(*)')
+      .eq('user_id', userId)
+      .not('tournament_id', 'is', null);
+    if (error) throw error;
+    return (data ?? []).map((row: any) => row.tournaments).filter(Boolean);
+  },
+
+  async players(userId: string): Promise<PlayerRow[]> {
+    const { data, error } = await supabase
+      .from('follows')
+      .select('players(*)')
+      .eq('user_id', userId)
+      .not('player_id', 'is', null);
+    if (error) throw error;
+    return (data ?? []).map((row: any) => row.players).filter(Boolean);
+  },
+
+  async add(userId: string, target: FollowTarget): Promise<void> {
+    const { error } = await supabase.from('follows').insert({
+      user_id: userId,
+      team_id: target.teamId ?? null,
+      tournament_id: target.tournamentId ?? null,
+      player_id: target.playerId ?? null,
+    });
+    if (error) throw error;
+  },
+
+  async remove(userId: string, target: FollowTarget): Promise<void> {
+    let query = supabase.from('follows').delete().eq('user_id', userId);
+    if (target.teamId) query = query.eq('team_id', target.teamId);
+    if (target.tournamentId) query = query.eq('tournament_id', target.tournamentId);
+    if (target.playerId) query = query.eq('player_id', target.playerId);
+    const { error } = await query;
+    if (error) throw error;
+  },
+
+  /** Fixtures and results involving any team the user follows. */
+  async feed(userId: string, limit = 20): Promise<MatchSummaryRow[]> {
+    const followedTeams = await follows.teams(userId);
+    if (!followedTeams.length) return [];
+
+    const ids = followedTeams.map((t) => t.id);
+    const { data, error } = await supabase
+      .from('match_summaries')
+      .select('*')
+      .or(`home_team_id.in.(${ids.join(',')}),away_team_id.in.(${ids.join(',')})`)
+      .order('scheduled_at', { ascending: true })
+      .limit(limit);
+    if (error) throw error;
+    return data ?? [];
   },
 };
 

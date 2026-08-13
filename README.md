@@ -66,7 +66,56 @@ Until the keys are set the app opens on a setup screen instead of crashing.
 Sign up in the app, then open **More → Organiser console** and create an
 organisation. Whoever creates it becomes its `tournament_admin` automatically.
 From there you can add teams and players, create a competition, generate the
-whole fixture list in one tap, and assign scorers.
+whole fixture list in one tap, and appoint scorers.
+
+---
+
+## Who can do what
+
+| Role | Can |
+|---|---|
+| *(signed out)* | Browse fixtures, live scores, scorecards, tables and stats |
+| `fan` | The above, plus follow teams/competitions/players, and apply to join a squad |
+| `player` | The above, plus their own linked career record |
+| `scorer` | Record balls, but **only** in matches they are appointed to |
+| `umpire` | Appointed to a match; read access to officials' channels |
+| `team_manager` | Add and edit players and squads |
+| `tournament_admin` | Everything within their organisation |
+| `platform_admin` | Everything |
+
+These are enforced by row level security in the database, not just hidden in the
+UI — a crafted API call from a fan still cannot write a ball.
+
+### Players registering themselves
+
+A cricketer does not need an organiser to type them in. From **More → Register
+as a player** (or the button on any team page) they:
+
+1. sign in,
+2. pick the club and team,
+3. fill in their name, squad number, role, batting and bowling style,
+4. add a profile photo,
+5. optionally write a note to the organiser.
+
+That creates a row in `player_registrations` and **nothing else** — the roster,
+the squad list and the statistics are untouched. The organiser gets a
+notification and reviews it under **Organiser console → Player registrations**.
+
+Approving runs the `approve_registration` database function, which in one
+transaction creates the player, adds them to the squad, links the record to
+their account, gives them the `player` role, and notifies them. It re-checks
+that the caller is an administrator, so an applicant cannot approve themselves.
+Rejecting keeps a record and lets them apply again later.
+
+A person can only have one pending application per team, enforced by a partial
+unique index rather than a UI check.
+
+### Appointing scorers
+
+**Organiser console → Scorers & umpires.** Pick a fixture, then pick who is
+scoring it. This matters: the RLS policy on `deliveries` only accepts a ball
+from an organisation administrator or someone named in `match_officials` for
+that exact match. Until you appoint someone, only admins can score.
 
 ---
 
@@ -218,9 +267,11 @@ Deliberately left out of this pass, in rough priority order:
 
 - **Fantasy leagues.** The earlier prototype had a credit-based picker; making it
   real needs its own contest, entry and points tables rather than a static screen.
-- **Push notifications.** The `device_sessions` table and the notification centre
-  exist, but sending needs a server function and a development build — Expo Go
-  cannot receive push on SDK 54.
+  `players.credit_value` is already there for it.
+- **Push notifications.** Notifications are created and delivered inside the app
+  (registration submitted, approved, rejected). Pushing them to a locked phone
+  needs a server function plus a development build — Expo Go cannot receive push
+  on SDK 54. The `device_sessions` table is ready for the tokens.
 - **Live video.** `matches.stream_url` is stored and nothing consumes it yet.
 - **DLS.** `innings.revised_target` exists for manual entry; the Duckworth–Lewis
   calculation itself is not implemented.

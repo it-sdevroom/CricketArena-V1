@@ -41,13 +41,19 @@ export default function Home() {
 
   const activeLeague = leagues.data?.find((t) => t.status === 'active') ?? leagues.data?.[0];
 
+  // Organisers get their tools first; everyone else gets the two things a fan
+  // or a club cricketer actually opens the app for.
   const quickActions: { icon: keyof typeof Ionicons.glyphMap; label: string; href: string }[] = [
     ...(can.manageTournaments
       ? ([{ icon: 'add-circle', label: 'New tournament', href: '/organizer/new-tournament' }] as const)
       : []),
-    ...(can.manageSquads
-      ? ([{ icon: 'people', label: 'Teams & players', href: '/organizer/squads' }] as const)
+    ...(can.manageTournaments
+      ? ([{ icon: 'checkmark-done', label: 'Registrations', href: '/organizer/approvals' }] as const)
       : []),
+    ...(!can.manageTournaments
+      ? ([{ icon: 'person-add', label: 'Play for a team', href: '/join-team' }] as const)
+      : []),
+    { icon: 'heart', label: 'Following', href: '/following' },
     { icon: 'calendar', label: 'Fixtures', href: '/(tabs)/matches' },
     { icon: 'stats-chart', label: 'Leaderboards', href: '/(tabs)/stats' },
   ];
