@@ -8,8 +8,8 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://your-project-ref.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-anon-public-key"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://avbdgmwsurlgvokuyzom.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Srei_4H1rZ1fcYyIi2zVfA_EIPKwfzE"
       }
     },
     "preview": {
@@ -18,8 +18,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://your-project-ref.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-anon-public-key"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://avbdgmwsurlgvokuyzom.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Srei_4H1rZ1fcYyIi2zVfA_EIPKwfzE"
       }
     },
     "production": {
@@ -28,8 +28,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://your-project-ref.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "your-anon-public-key"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://avbdgmwsurlgvokuyzom.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Srei_4H1rZ1fcYyIi2zVfA_EIPKwfzE"
       }
     }
   },
