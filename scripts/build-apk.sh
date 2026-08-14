@@ -18,11 +18,63 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # --- toolchain -------------------------------------------------------------
-# Expo SDK 54 needs JDK 17 or newer. The system Java here is 8, so point at the
-# JDK that ships inside Android Studio rather than asking anyone to install one.
+# Two different Java requirements, which is easy to trip over:
+#
+#   * Gradle itself runs happily on 17 or newer, so Android Studio's bundled
+#     JDK 21 is fine to launch the build with.
+#   * React Native's Gradle plugin compiles its Kotlin against a toolchain
+#     pinned to *exactly* 17. Gradle will not substitute 21, and if no 17 is
+#     installed it tries to download one from Adoptium mid-build — which fails
+#     on a slow connection and wastes the whole run.
+#
+# So we make sure a real JDK 17 exists up front. ~/.jdks is one of the
+# locations Gradle auto-detects, so simply unpacking it there is enough; no
+# gradle.properties entry is needed and it survives `expo prebuild`.
+JDK17_DIR=$(find "$HOME/.jdks" -maxdepth 1 -type d -name "jdk-17*" 2>/dev/null | head -1)
+
+if [ -z "$JDK17_DIR" ]; then
+  echo "JDK 17 not found in ~/.jdks — fetching it (about 180 MB, resumable)."
+  mkdir -p "$HOME/.jdks"
+
+  # Corretto first, Adoptium second. Adoptium redirects to github.com, which is
+  # not always resolvable here, whereas Corretto is served straight from AWS.
+  # Both are fine builds of OpenJDK 17; whichever arrives is good enough.
+  ( cd "$HOME/.jdks"
+    for source in \
+      "https://corretto.aws/downloads/latest/amazon-corretto-17-x64-windows-jdk.zip" \
+      "https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jdk/hotspot/normal/eclipse"
+    do
+      echo "  trying ${source%%/downloads*}"
+      if curl -L --fail --retry 25 --retry-delay 4 --retry-all-errors --continue-at - \
+           --connect-timeout 30 --speed-time 180 --speed-limit 512 \
+           -o jdk17.zip "$source"
+      then
+        # A truncated archive is worse than none: verify before unpacking.
+        if unzip -t jdk17.zip >/dev/null 2>&1; then
+          unzip -q -o jdk17.zip && rm -f jdk17.zip
+          break
+        fi
+        echo "  archive was corrupt, discarding"
+        rm -f jdk17.zip
+      fi
+    done )
+
+  JDK17_DIR=$(find "$HOME/.jdks" -maxdepth 1 -type d \( -name "jdk-17*" -o -name "*corretto-17*" \) | head -1)
+fi
+
+if [ -z "$JDK17_DIR" ]; then
+  echo "Could not obtain a JDK 17. Install one, or build through EAS instead:" >&2
+  echo "  npx eas-cli@latest build --platform android --profile preview" >&2
+  exit 1
+fi
+
+[ -n "$JDK17_DIR" ] && echo "JDK 17:      $JDK17_DIR"
+
+# Gradle itself launches on whichever JDK we hand it; 21 is fine.
 for candidate in \
   "/c/Program Files/Android/Android Studio/jbr" \
   "C:/Program Files/Android/Android Studio/jbr" \
+  "$JDK17_DIR" \
   "${JAVA_HOME:-}"
 do
   if [ -x "$candidate/bin/java.exe" ] || [ -x "$candidate/bin/java" ]; then
