@@ -34,6 +34,7 @@ export default function NewTournament() {
   const [format, setFormat] = useState<(typeof FORMATS)[number]['value']>('round_robin');
   const [matchFormat, setMatchFormat] = useState<(typeof MATCH_FORMATS)[number]['value']>('T20');
   const [description, setDescription] = useState('');
+  const [groupCount, setGroupCount] = useState(4);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,6 +59,9 @@ export default function NewTournament() {
         description: description.trim() || null,
         status: 'active',
         is_public: true,
+        // Only meaningful for the group format; one group elsewhere keeps the
+        // fixture generator's arithmetic honest.
+        group_count: format === 'groups' ? groupCount : 1,
         start_date: new Date().toISOString().slice(0, 10),
         // Playing conditions come from the chosen format so the scoring engine
         // and the database agree from the first ball.
@@ -138,6 +142,22 @@ export default function NewTournament() {
         options={FORMATS.map((f) => ({ value: f.value, label: f.label }))}
       />
       <Text style={s.hint}>{FORMATS.find((f) => f.value === format)?.detail}</Text>
+
+      {format === 'groups' ? (
+        <>
+          <Text style={s.label}>NUMBER OF GROUPS</Text>
+          <Segmented
+            value={String(groupCount)}
+            onChange={(v) => setGroupCount(Number(v))}
+            options={[2, 3, 4, 6, 8].map((n) => ({ value: String(n), label: String(n) }))}
+          />
+          <Text style={s.hint}>
+            Teams are shared out with a snake draft, so the groups stay balanced however many you
+            enter. With {groupCount} groups, 16 teams gives {16 / groupCount} per group and{' '}
+            {groupCount * (((16 / groupCount) * (16 / groupCount - 1)) / 2)} group matches.
+          </Text>
+        </>
+      ) : null}
 
       <Input
         label="DESCRIPTION (OPTIONAL)"

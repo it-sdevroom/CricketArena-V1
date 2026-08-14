@@ -229,3 +229,56 @@ describe('formatNetRunRate', () => {
     assert.equal(formatNetRunRate(0), '0.000');
   });
 });
+
+describe('four groups of four', () => {
+  const ids = teams(16);
+  const fixtures = groupStage(ids, 4);
+
+  it('splits sixteen sides into four groups of four', () => {
+    const byGroup = new Map<string, Set<string>>();
+    for (const f of fixtures) {
+      const set = byGroup.get(f.group!) ?? new Set<string>();
+      set.add(f.homeTeamId!);
+      set.add(f.awayTeamId!);
+      byGroup.set(f.group!, set);
+    }
+    assert.deepEqual([...byGroup.keys()].sort(), ['A', 'B', 'C', 'D']);
+    for (const [label, members] of byGroup) {
+      assert.equal(members.size, 4, `group ${label} should hold four sides`);
+    }
+  });
+
+  it('plays six matches inside each group and none across them', () => {
+    // Four sides meeting once each is 4C2 = 6, so 24 in total.
+    assert.equal(fixtures.length, 24);
+
+    const groupOf = new Map<string, string>();
+    for (const f of fixtures) {
+      groupOf.set(f.homeTeamId!, f.group!);
+      groupOf.set(f.awayTeamId!, f.group!);
+    }
+    for (const f of fixtures) {
+      assert.equal(
+        groupOf.get(f.homeTeamId!),
+        groupOf.get(f.awayTeamId!),
+        'a fixture must never pair sides from different groups',
+      );
+    }
+  });
+
+  it('never repeats a pairing', () => {
+    const pairs = fixtures.map((f) => [f.homeTeamId, f.awayTeamId].sort().join('|'));
+    assert.equal(new Set(pairs).size, pairs.length);
+  });
+
+  it('seeds by snake draft so one group does not collect every top seed', () => {
+    const groupOfTeam = new Map<string, string>();
+    for (const f of fixtures) {
+      groupOfTeam.set(f.homeTeamId!, f.group!);
+      groupOfTeam.set(f.awayTeamId!, f.group!);
+    }
+    // The top four seeds must land in four different groups.
+    const topFour = ids.slice(0, 4).map((id) => groupOfTeam.get(id));
+    assert.equal(new Set(topFour).size, 4);
+  });
+});

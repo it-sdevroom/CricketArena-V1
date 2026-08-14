@@ -16,6 +16,46 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+PROJECT_DIR="$(pwd -W 2>/dev/null || pwd)"
+
+# --- Windows path length ---------------------------------------------------
+# The New Architecture compiles C++ through CMake, and ninja bakes the full
+# source path into every object filename. Under
+# F:\Projects\Cricket\CricketArena-Mobile-App-v2\CricketArena that overruns
+# Windows' 260-character limit and the build dies after half an hour of work:
+#
+#   ninja: error: Stat(...RNCSafeAreaViewShadowNode.cpp.o):
+#          Filename longer than 260 characters
+#
+# Mapping the project to a one-letter virtual drive removes 57 characters from
+# every path, which is comfortably enough. subst is per-session and changes
+# nothing on disk.
+if [ "${OS:-}" = "Windows_NT" ] && [ ${#PROJECT_DIR} -gt 24 ]; then
+  SHORT_DRIVE="${SHORT_DRIVE:-X:}"
+  # Map the PARENT, so the project lands at X:\<name> rather than at X:\.
+  # Expo's autolinking walks up from the project root looking for package.json
+  # and cannot cope with a drive root, failing with
+  #   Couldn't find "package.json" up from path "X:\"
+  PARENT_DIR=$(dirname "$PROJECT_DIR")
+  PROJECT_NAME=$(basename "$PROJECT_DIR")
+  WIN_PARENT=$(echo "$PARENT_DIR" | sed 's|/|\\|g')
+
+  cmd //c "subst $SHORT_DRIVE /D" >/dev/null 2>&1 || true
+  cmd //c "subst $SHORT_DRIVE $WIN_PARENT" >/dev/null 2>&1 || true
+
+  MOUNT="/$(echo "${SHORT_DRIVE%:}" | tr 'A-Z' 'a-z')/$PROJECT_NAME"
+  if [ -f "$MOUNT/package.json" ]; then
+    echo "Short path:  $SHORT_DRIVE\\$PROJECT_NAME  (was $PROJECT_DIR)"
+    # CMake caches absolute paths, so anything configured under the long path
+    # has to go or it will keep using it.
+    find "$MOUNT/android" "$MOUNT/node_modules" -type d -name ".cxx" -prune \
+      -exec rm -rf {} + 2>/dev/null || true
+    cd "$MOUNT"
+  else
+    echo "Could not map $SHORT_DRIVE; continuing from the long path." >&2
+    echo "If the C++ build fails on filename length, free up that drive letter." >&2
+  fi
+fi
 
 # --- toolchain -------------------------------------------------------------
 # Two different Java requirements, which is easy to trip over:
