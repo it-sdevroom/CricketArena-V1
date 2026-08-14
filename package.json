@@ -9,7 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/domain/__tests__/scoring.test.ts src/domain/__tests__/tournament.test.ts",
+    "test": "tsx --test src/domain/__tests__/scoring.test.ts src/domain/__tests__/tournament.test.ts src/domain/__tests__/commentary.test.ts",
     "verify:schema": "tsx scripts/verify-schema.ts",
     "check": "npm run typecheck && npm run test && npm run verify:schema && npm run verify:combined",
     "export:web": "expo export --platform web --output-dir dist",

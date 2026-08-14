@@ -33,6 +33,7 @@ import type {
   PlayerRow,
   PlayingXiRow,
   ProfileRow,
+  ResultKind,
   RegistrationRow,
   StandingsRowDb,
   TeamRow,
@@ -625,6 +626,8 @@ export const scoring = {
     battingTeamId: string;
     bowlingTeamId: string;
     target?: number | null;
+    isSuperOver?: boolean;
+    superOverNumber?: number | null;
   }): Promise<InningsRow> {
     return unwrap(
       await supabase
@@ -635,7 +638,62 @@ export const scoring = {
           batting_team_id: input.battingTeamId,
           bowling_team_id: input.bowlingTeamId,
           target: input.target ?? null,
+          is_super_over: input.isSuperOver ?? false,
+          super_over_number: input.isSuperOver ? (input.superOverNumber ?? 1) : null,
         })
+        .select('*')
+        .single(),
+    );
+  },
+
+  /**
+   * Record the outcome of a finished match.
+   *
+   * Setting `status` alone is not enough: `tournament_standings` only counts a
+   * match once `result_kind` is set, so a match marked complete without one
+   * silently never reaches the points table.
+   */
+  async finishMatch(input: {
+    matchId: string;
+    kind: ResultKind;
+    winnerTeamId?: string | null;
+    summary: string;
+    marginRuns?: number | null;
+    marginWickets?: number | null;
+    decidedBySuperOver?: boolean;
+    playerOfMatchId?: string | null;
+  }): Promise<MatchRow> {
+    return unwrap(
+      await supabase
+        .from('matches')
+        .update({
+          status: input.kind === 'abandoned' ? 'abandoned' : 'completed',
+          result_kind: input.kind,
+          winner_team_id: input.winnerTeamId ?? null,
+          result_summary: input.summary,
+          result_margin_runs: input.marginRuns ?? null,
+          result_margin_wickets: input.marginWickets ?? null,
+          decided_by_super_over: input.decidedBySuperOver ?? false,
+          player_of_match_id: input.playerOfMatchId ?? null,
+        })
+        .eq('id', input.matchId)
+        .select('*')
+        .single(),
+    );
+  },
+
+  /** Abandon a match without a result, e.g. rain. Both sides take a point. */
+  async abandonMatch(matchId: string, reason: string): Promise<MatchRow> {
+    return unwrap(
+      await supabase
+        .from('matches')
+        .update({
+          status: 'abandoned',
+          result_kind: 'no_result',
+          winner_team_id: null,
+          result_summary: reason,
+        })
+        .eq('id', matchId)
         .select('*')
         .single(),
     );

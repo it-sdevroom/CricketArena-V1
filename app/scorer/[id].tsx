@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -8,7 +8,7 @@ import { BallChip, Button, Card, ChipGroup, ErrorNotice, Loading, Pill, Screen }
 import { C } from '@/constants/theme';
 import { DISMISSAL_OPTIONS, deliveryLabel } from '@/src/data/mappers';
 import { newIdempotencyKey } from '@/src/data/queue';
-import { matches, scoring } from '@/src/data/repo';
+import { matches, scoring, teams } from '@/src/data/repo';
 import { chaseSummary, currentRunRate, formatOvers, requiredRunRate, validateDelivery } from '@/src/domain/scoring';
 import type { Delivery, DismissalKind } from '@/src/domain/types';
 import { useAuth } from '@/src/store/auth';
@@ -23,6 +23,20 @@ export default function ScoringConsole() {
   const queryClient = useQueryClient();
   const live = useLiveMatch(id);
   const nameOf = useNameLookup(live.squads);
+
+  // Team names, for writing the result line ("Falcons won by 6 runs").
+  const teamNames = useQuery({
+    queryKey: ['match-teams', live.match?.home_team_id, live.match?.away_team_id],
+    enabled: !!live.match?.home_team_id && !!live.match?.away_team_id,
+    queryFn: async () => {
+      const [home, away] = await Promise.all([
+        teams.get(live.match!.home_team_id!),
+        teams.get(live.match!.away_team_id!),
+      ]);
+      return { [home!.id]: home!.name, [away!.id]: away!.name } as Record<string, string>;
+    },
+  });
+  const teamName = (teamId: string) => teamNames.data?.[teamId] ?? 'The winning side';
 
   const [extraMode, setExtraMode] = useState<ExtraMode>('none');
   const [wicketOpen, setWicketOpen] = useState(false);
@@ -163,7 +177,20 @@ export default function ScoringConsole() {
     ]);
   };
 
+  /**
+   * Close this innings and move the match on.
+   *
+   * The branching is all cricket, not plumbing: the first innings sets a
+   * target, the second decides the match unless the scores are level, and a
+   * level score starts a super over — which can itself tie, and then needs
+   * another one.
+   */
   const endInnings = () => {
+    const isSuperOver = !!innings.is_super_over;
+    const isFirstOfPair = isSuperOver
+      ? innings.innings_number % 2 === 1
+      : innings.innings_number === 1;
+
     Alert.alert('End this innings?', 'You can still correct deliveries afterwards.', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -172,18 +199,102 @@ export default function ScoringConsole() {
           setBusy(true);
           try {
             await scoring.closeInnings(innings.id, state.endReason ?? 'declared');
-            if (innings.innings_number === 1) {
+
+            if (isFirstOfPair) {
+              // Set the chase.
               await scoring.startInnings({
                 matchId: match.id,
-                inningsNumber: 2,
+                inningsNumber: innings.innings_number + 1,
                 battingTeamId: innings.bowling_team_id,
                 bowlingTeamId: innings.batting_team_id,
                 target: state.runs + 1,
+                isSuperOver,
+                superOverNumber: innings.super_over_number,
               });
               await matches.update(match.id, { status: 'live' });
-            } else {
-              await matches.update(match.id, { status: 'completed' });
+              live.refetch();
+              return;
             }
+
+            // Second innings of the pair: the target came from the first, so
+            // the first innings total is one less than it.
+            const firstTotal = (innings.target ?? state.runs + 1) - 1;
+            const chased = state.runs;
+
+            if (chased === firstTotal) {
+              // Level scores. Offer a super over rather than settling for a tie.
+              const nextSuperOver = (innings.super_over_number ?? 0) + 1;
+              setBusy(false);
+              Alert.alert(
+                isSuperOver ? 'Super over tied' : 'Scores level',
+                isSuperOver
+                  ? 'The super over finished level. The laws call for another one.'
+                  : 'Both sides finished on the same score. Play a super over, or record it as a tie.',
+                [
+                  {
+                    text: 'Record a tie',
+                    style: 'cancel',
+                    onPress: async () => {
+                      setBusy(true);
+                      try {
+                        await scoring.finishMatch({
+                          matchId: match.id,
+                          kind: 'tie',
+                          summary: 'Match tied',
+                          decidedBySuperOver: isSuperOver,
+                        });
+                        live.refetch();
+                      } catch (e) {
+                        setError(describeError(e));
+                      } finally {
+                        setBusy(false);
+                      }
+                    },
+                  },
+                  {
+                    text: `Play super over ${nextSuperOver}`,
+                    onPress: async () => {
+                      setBusy(true);
+                      try {
+                        // The side that batted second in the tied innings bats
+                        // first in the super over.
+                        await scoring.startInnings({
+                          matchId: match.id,
+                          inningsNumber: innings.innings_number + 1,
+                          battingTeamId: innings.batting_team_id,
+                          bowlingTeamId: innings.bowling_team_id,
+                          isSuperOver: true,
+                          superOverNumber: nextSuperOver,
+                        });
+                        await matches.update(match.id, { status: 'live' });
+                        live.refetch();
+                      } catch (e) {
+                        setError(describeError(e));
+                      } finally {
+                        setBusy(false);
+                      }
+                    },
+                  },
+                ],
+              );
+              return;
+            }
+
+            const chasingWon = chased > firstTotal;
+            const winnerTeamId = chasingWon ? innings.batting_team_id : innings.bowling_team_id;
+            const wicketsLeft = rules.playersPerSide - 1 - state.wickets;
+
+            await scoring.finishMatch({
+              matchId: match.id,
+              kind: 'win',
+              winnerTeamId,
+              summary: chasingWon
+                ? `${teamName(winnerTeamId)} won by ${wicketsLeft} wicket${wicketsLeft === 1 ? '' : 's'}`
+                : `${teamName(winnerTeamId)} won by ${firstTotal - chased} run${firstTotal - chased === 1 ? '' : 's'}`,
+              marginRuns: chasingWon ? null : firstTotal - chased,
+              marginWickets: chasingWon ? wicketsLeft : null,
+              decidedBySuperOver: isSuperOver,
+            });
             live.refetch();
           } catch (e) {
             setError(describeError(e));

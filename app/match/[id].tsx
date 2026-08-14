@@ -18,6 +18,7 @@ import {
   Section,
   Segmented,
 } from '@/components/UI';
+import { Commentary } from '@/components/Commentary';
 import { C } from '@/constants/theme';
 import { deliveryLabel, dismissalText } from '@/src/data/mappers';
 import { matches } from '@/src/data/repo';
@@ -126,9 +127,9 @@ export default function MatchCentre() {
         ) : null}
       </Card>
 
-      {canScore ? (
-        <View style={s.actions}>
-          {!xiSet ? (
+      <View style={s.actions}>
+        {canScore ? (
+          !xiSet ? (
             <XiPicker match={match} onDone={live.refetch} />
           ) : (
             <Button
@@ -136,9 +137,16 @@ export default function MatchCentre() {
               icon="baseball-outline"
               onPress={() => router.push(`/scorer/${match.id}`)}
             />
-          )}
-        </View>
-      ) : null}
+          )
+        ) : null}
+
+        <Button
+          title="Highlights & photos"
+          icon="videocam-outline"
+          secondary
+          onPress={() => router.push(`/highlights/${match.id}`)}
+        />
+      </View>
 
       <View style={s.tabs}>
         <Segmented
@@ -190,7 +198,6 @@ function LiveTab({
 
   const maxOvers = live.currentInnings?.reduced_overs ?? match.overs_per_innings;
   const rrr = requiredRunRate(state, rules, maxOvers);
-  const recent = state.overs.slice(-3).flatMap((o) => o.deliveries).slice(-12).reverse();
   const atCrease = state.batting.filter(
     (b) => b.playerId === state.strikerId || b.playerId === state.nonStrikerId,
   );
@@ -291,21 +298,13 @@ function LiveTab({
         </Card>
       </Section>
 
-      <Section title="Ball by ball">
+      <Section title="Commentary">
         <Card>
-          {recent.length ? (
-            recent.map((d, i) => (
-              <View key={d.id || i} style={[s.commentaryRow, i > 0 && s.creaseRowBorder]}>
-                <BallChip label={deliveryLabel(d)} tone={d.wicket ? 'red' : undefined} />
-                <Text style={s.commentaryText} numberOfLines={2}>
-                  {nameOf(d.bowlerId)} to {nameOf(d.strikerId)}
-                  {d.wicket ? ` — OUT, ${dismissalText(d.wicket.kind, nameOf(d.bowlerId), nameOf(d.wicket.fielderId ?? null))}` : ''}
-                </Text>
-              </View>
-            ))
-          ) : (
-            <Text style={s.muted}>No deliveries yet.</Text>
-          )}
+          <Commentary
+            deliveries={state.overs.flatMap((o) => o.deliveries)}
+            rules={rules}
+            nameOf={(id) => nameOf(id)}
+          />
         </Card>
       </Section>
     </>

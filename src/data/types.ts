@@ -224,6 +224,8 @@ export interface InningsRow {
   target: number | null;
   reduced_overs: number | null;
   revised_target: number | null;
+  is_super_over: boolean;
+  super_over_number: number | null;
   closed: boolean;
   end_reason: string | null;
   started_at: string;
