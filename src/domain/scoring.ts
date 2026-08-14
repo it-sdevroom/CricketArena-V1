@@ -568,6 +568,36 @@ export function decideResult(
   return { kind: 'tie', winnerTeamId: null };
 }
 
+/**
+ * Decide a super over.
+ *
+ * The side scoring more in their over wins the match. If the super over is
+ * itself tied, the laws now call for another one rather than counting
+ * boundaries, so this reports a tie and the caller starts the next.
+ */
+export function decideSuperOver(
+  first: InningsState,
+  second: InningsState,
+): MatchResultInput & { needsAnotherSuperOver: boolean } {
+  if (second.runs > first.runs) {
+    return {
+      kind: 'win',
+      winnerTeamId: second.battingTeamId,
+      byWickets: 2 - second.wickets,
+      needsAnotherSuperOver: false,
+    };
+  }
+  if (first.runs > second.runs) {
+    return {
+      kind: 'win',
+      winnerTeamId: first.battingTeamId,
+      byRuns: first.runs - second.runs,
+      needsAnotherSuperOver: false,
+    };
+  }
+  return { kind: 'tie', winnerTeamId: null, needsAnotherSuperOver: true };
+}
+
 export interface MatchResultInput {
   kind: 'win' | 'tie' | 'draw' | 'no_result' | 'abandoned' | 'walkover';
   winnerTeamId: string | null;

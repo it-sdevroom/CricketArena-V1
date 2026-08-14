@@ -25,6 +25,8 @@ import type {
   InningsRow,
   MatchRow,
   MatchSummaryRow,
+  MediaKind,
+  MediaRow,
   MessageRow,
   NotificationRow,
   OrganizationRow,
@@ -1057,6 +1059,61 @@ export const notifications = {
       .update({ read_at: new Date().toISOString() })
       .eq('user_id', userId)
       .is('read_at', null);
+    if (error) throw error;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Highlights, photographs and streams
+// ---------------------------------------------------------------------------
+
+export const media = {
+  /** Everything attached to one match, newest first. */
+  async forMatch(matchId: string): Promise<MediaRow[]> {
+    return unwrap(
+      await supabase
+        .from('media')
+        .select('*')
+        .eq('match_id', matchId)
+        .order('is_featured', { ascending: false })
+        .order('created_at', { ascending: false }),
+    );
+  },
+
+  /** Everything across a competition, for the highlights reel. */
+  async forTournament(tournamentId: string, limit = 50): Promise<MediaRow[]> {
+    return unwrap(
+      await supabase
+        .from('media')
+        .select('*')
+        .eq('tournament_id', tournamentId)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+    );
+  },
+
+  async create(input: {
+    organization_id: string;
+    match_id?: string | null;
+    tournament_id?: string | null;
+    kind: MediaKind;
+    title: string;
+    url: string;
+    description?: string | null;
+    thumbnail_url?: string | null;
+    over_number?: number | null;
+  }, userId: string): Promise<MediaRow> {
+    return unwrap(
+      await supabase
+        .from('media')
+        .insert({ ...input, created_by: userId })
+        .select('*')
+        .single(),
+    );
+  },
+
+  async remove(id: string): Promise<void> {
+    const { error } = await supabase.from('media').delete().eq('id', id);
     if (error) throw error;
   },
 };

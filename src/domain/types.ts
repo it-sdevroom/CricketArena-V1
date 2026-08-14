@@ -148,6 +148,27 @@ export const TEST_RULES: MatchRules = {
   countByesOnNoBall: true,
 };
 
+/**
+ * A super over, played to break a tie.
+ *
+ * The laws differ from a normal innings in ways that matter to the engine:
+ * one over per side, and the innings ends after *two* wickets rather than all
+ * ten, because only three batters are nominated. Expressing that as
+ * `playersPerSide: 3` lets the existing all-out check handle it unchanged —
+ * the engine closes an innings at `playersPerSide - 1` wickets.
+ *
+ * There is no bowler quota worth enforcing over a single over, and a no ball
+ * still brings a free hit in the formats that use one.
+ */
+export function superOverRules(base: MatchRules): MatchRules {
+  return {
+    ...base,
+    oversPerInnings: 1,
+    playersPerSide: 3,
+    maxOversPerBowler: 1,
+  };
+}
+
 export const RULE_PRESETS: Record<string, MatchRules> = {
   T10: T10_RULES,
   T20: T20_RULES,

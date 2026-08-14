@@ -61,14 +61,17 @@ export async function takePhoto(): Promise<PickedImage | null> {
 }
 
 /**
- * Shrink to 512px and re-encode as JPEG before upload.
+ * Shrink and re-encode as JPEG before upload.
  *
- * A modern phone camera produces several megabytes; the bucket caps objects at
- * 2 MB and nobody needs more than 512px for an avatar. Doing this client-side
- * also means less to upload over ground-level mobile data.
+ * A modern phone camera produces several megabytes; nobody needs more than
+ * 512px for an avatar or a crest. Doing this client-side also means far less to
+ * upload over ground-level mobile data at a cricket ground.
  */
-async function normalise(uri: string): Promise<{ uri: string; contentType: string }> {
-  const result = await ImageManipulator.manipulateAsync(uri, [{ resize: { width: 512 } }], {
+async function normalise(
+  uri: string,
+  maxWidth = 512,
+): Promise<{ uri: string; contentType: string }> {
+  const result = await ImageManipulator.manipulateAsync(uri, [{ resize: { width: maxWidth } }], {
     compress: 0.8,
     format: ImageManipulator.SaveFormat.JPEG,
   });
@@ -76,31 +79,74 @@ async function normalise(uri: string): Promise<{ uri: string; contentType: strin
 }
 
 /**
- * Upload an avatar and return its public URL.
- * `upsert` means re-uploading replaces the previous photo rather than piling up.
+ * Resize, upload and return a public URL.
+ *
+ * `folder` is the first path segment, and every storage policy keys off it:
+ * the avatars bucket expects a user id, team logos and match media expect an
+ * organisation id. Getting it wrong is a permission error, not a silent
+ * mis-file.
  */
-export async function uploadAvatar(userId: string, localUri: string): Promise<string> {
-  const { uri, contentType } = await normalise(localUri);
+async function uploadImage(options: {
+  bucket: string;
+  folder: string;
+  prefix: string;
+  localUri: string;
+  maxWidth?: number;
+  maxBytes?: number;
+}): Promise<string> {
+  const { bucket, folder, prefix, localUri, maxWidth = 512, maxBytes = 2 * 1024 * 1024 } = options;
+  const { uri, contentType } = await normalise(localUri, maxWidth);
 
   const response = await fetch(uri);
   if (!response.ok) throw new Error('Could not read the selected image.');
   const bytes = await response.arrayBuffer();
 
-  if (bytes.byteLength > 2 * 1024 * 1024) {
+  if (bytes.byteLength > maxBytes) {
     throw new Error('That image is too large even after resizing. Try a different one.');
   }
 
-  // A changing filename busts any CDN cache of the previous photo.
-  const path = `${userId}/avatar-${Date.now()}.jpg`;
+  // A changing filename busts any CDN cache of the previous image.
+  const path = `${folder}/${prefix}-${Date.now()}.jpg`;
 
-  const { error } = await supabase.storage.from(BUCKET).upload(path, bytes, {
+  const { error } = await supabase.storage.from(bucket).upload(path, bytes, {
     contentType,
     upsert: true,
   });
   if (error) throw error;
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+}
+
+/** A team crest. Stored per organisation, so managers can maintain their own. */
+export async function uploadTeamLogo(organizationId: string, localUri: string): Promise<string> {
+  return uploadImage({
+    bucket: 'team-logos',
+    folder: organizationId,
+    prefix: 'logo',
+    localUri,
+    maxWidth: 512,
+    maxBytes: 1024 * 1024,
+  });
+}
+
+/** A match photograph or highlight still. Allowed to be larger than an avatar. */
+export async function uploadMatchPhoto(organizationId: string, localUri: string): Promise<string> {
+  return uploadImage({
+    bucket: 'match-media',
+    folder: organizationId,
+    prefix: 'photo',
+    localUri,
+    maxWidth: 1600,
+    maxBytes: 10 * 1024 * 1024,
+  });
+}
+
+/**
+ * Upload an avatar and return its public URL.
+ * `upsert` means re-uploading replaces the previous photo rather than piling up.
+ */
+export async function uploadAvatar(userId: string, localUri: string): Promise<string> {
+  return uploadImage({ bucket: BUCKET, folder: userId, prefix: 'avatar', localUri });
 }
 
 /** Remove every avatar this user has uploaded. */

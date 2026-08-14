@@ -3,7 +3,9 @@ import { StyleSheet, Text } from 'react-native';
 import { router } from 'expo-router';
 
 import { Button, Card, EmptyState, ErrorNotice, Input, Screen, Section } from '@/components/UI';
+import { PhotoField } from '@/components/PhotoField';
 import { C } from '@/constants/theme';
+import { uploadAvatar } from '@/src/lib/storage';
 import { auth } from '@/src/data/repo';
 import { useAuth } from '@/src/store/auth';
 import { describeError } from '@/src/lib/supabase';
@@ -15,6 +17,7 @@ export default function Profile() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [photo, setPhoto] = useState<string | null>(profile?.avatar_url ?? null);
 
   if (!user) {
     return (
@@ -35,7 +38,21 @@ export default function Profile() {
     setError(null);
     setSaved(false);
     try {
-      await auth.updateProfile(user.id, { full_name: fullName.trim(), city: city.trim() || null });
+      let avatarUrl = profile?.avatar_url ?? null;
+
+      // A freshly picked photo is a local file:// or blob: URI. Anything
+      // starting with http is already in storage and needs no re-upload.
+      if (photo && !photo.startsWith('http')) {
+        avatarUrl = await uploadAvatar(user.id, photo);
+      } else if (photo === null) {
+        avatarUrl = null;
+      }
+
+      await auth.updateProfile(user.id, {
+        full_name: fullName.trim(),
+        city: city.trim() || null,
+        avatar_url: avatarUrl,
+      });
       await refresh();
       setSaved(true);
     } catch (e) {
@@ -48,6 +65,15 @@ export default function Profile() {
   return (
     <Screen>
       {error ? <ErrorNotice message={error} /> : null}
+
+      <PhotoField
+        label="PROFILE PHOTO"
+        value={photo}
+        onChange={setPhoto}
+        onError={setError}
+        busy={busy}
+        hint="Shown next to your name on scorecards and squad lists."
+      />
 
       <Input label="FULL NAME" value={fullName} onChangeText={setFullName} placeholder="Your name" />
       <Input label="CITY" value={city} onChangeText={setCity} placeholder="Riyadh" />

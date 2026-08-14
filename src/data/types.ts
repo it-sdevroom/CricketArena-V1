@@ -445,3 +445,24 @@ export interface NotificationRow {
   read_at: string | null;
   created_at: string;
 }
+
+export type MediaKind = 'video' | 'photo' | 'stream';
+
+export interface MediaRow {
+  id: string;
+  organization_id: string;
+  match_id: string | null;
+  tournament_id: string | null;
+  team_id: string | null;
+  player_id: string | null;
+  kind: MediaKind;
+  title: string;
+  description: string | null;
+  url: string;
+  thumbnail_url: string | null;
+  duration_seconds: number | null;
+  over_number: number | null;
+  is_featured: boolean;
+  created_by: string | null;
+  created_at: string;
+}

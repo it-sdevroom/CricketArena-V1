@@ -6,11 +6,12 @@ import {
   chaseSummary,
   currentRunRate,
   decideResult,
+  decideSuperOver,
   formatOvers,
   requiredRunRate,
   validateDelivery,
 } from '../scoring';
-import { Delivery, MatchRules, T20_RULES } from '../types';
+import { Delivery, MatchRules, T20_RULES, superOverRules } from '../types';
 
 const A = 'batter-a';
 const B = 'batter-b';
@@ -351,5 +352,68 @@ describe('result', () => {
       target: 5,
     });
     assert.equal(decideResult(first, second, rules, 20).kind, 'tie');
+  });
+});
+
+describe('super over', () => {
+  const so = superOverRules(rules);
+
+  function superInnings(deliveries: Delivery[], battingTeamId: string, target: number | null = null) {
+    return buildInnings(deliveries, {
+      battingTeamId,
+      bowlingTeamId: battingTeamId === 'team-home' ? 'team-away' : 'team-home',
+      rules: so,
+      target,
+    });
+  }
+
+  it('is one over long', () => {
+    assert.equal(so.oversPerInnings, 1);
+    const s = superInnings(Array.from({ length: 6 }, () => ball({ runsOffBat: 1 })), 'team-home');
+    assert.equal(s.closed, true);
+    assert.equal(s.endReason, 'overs_complete');
+  });
+
+  it('ends after two wickets, not ten', () => {
+    const s = superInnings(
+      [
+        ball({ wicket: { kind: 'bowled', playerOutId: A } }),
+        ball({ strikerId: C, wicket: { kind: 'bowled', playerOutId: C } }),
+      ],
+      'team-home',
+    );
+    assert.equal(s.wickets, 2);
+    assert.equal(s.closed, true);
+    assert.equal(s.endReason, 'all_out');
+  });
+
+  it('still ends the chase early when the target is passed', () => {
+    const s = superInnings([ball({ runsOffBat: 6 }), ball({ runsOffBat: 6 })], 'team-away', 11);
+    assert.equal(s.closed, true);
+    assert.equal(s.endReason, 'target_reached');
+  });
+
+  it('gives the match to whoever scored more', () => {
+    const first = superInnings(Array.from({ length: 6 }, () => ball({ runsOffBat: 2 })), 'team-home');
+    const second = superInnings(Array.from({ length: 6 }, () => ball({ runsOffBat: 1 })), 'team-away', 13);
+    const r = decideSuperOver(first, second);
+    assert.equal(r.winnerTeamId, 'team-home');
+    assert.equal(r.byRuns, 6);
+    assert.equal(r.needsAnotherSuperOver, false);
+  });
+
+  it('asks for another super over when that one ties too', () => {
+    const first = superInnings([ball({ runsOffBat: 4 })], 'team-home');
+    const second = superInnings([ball({ runsOffBat: 4 })], 'team-away', 5);
+    const r = decideSuperOver(first, second);
+    assert.equal(r.kind, 'tie');
+    assert.equal(r.needsAnotherSuperOver, true);
+  });
+
+  it('keeps the underlying laws, so a wide is still not a legal ball', () => {
+    const s = superInnings([ball({ wide: 0 })], 'team-home');
+    assert.equal(s.runs, 1);
+    assert.equal(s.legalBalls, 0);
+    assert.equal(s.closed, false);
   });
 });
