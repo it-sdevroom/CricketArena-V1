@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { flushQueue } from '@/src/data/queue';
 import { AuthProvider } from '@/src/store/auth';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { C } from '@/constants/theme';
 
 const queryClient = new QueryClient({
@@ -47,7 +48,20 @@ function useQueueDrain() {
   }, []);
 }
 
+/**
+ * The boundary has to sit above everything that can fail, including the queue
+ * drain and the providers. So the root component does nothing except mount it,
+ * and all the real work happens in the child below.
+ */
 export default function RootLayout() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
+}
+
+function App() {
   useQueueDrain();
   const [ready, setReady] = useState(false);
 
