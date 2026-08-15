@@ -148,6 +148,13 @@ export default function MatchCentre() {
           onPress={() => router.push(`/highlights/${match.id}`)}
         />
 
+        <Button
+          title={canScore ? 'Corrections' : 'Score changes'}
+          icon="shield-checkmark-outline"
+          secondary
+          onPress={() => router.push(`/corrections/${match.id}`)}
+        />
+
         {live.states.length ? (
           <Button
             title="Share scorecard (PDF)"

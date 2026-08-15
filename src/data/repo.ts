@@ -768,6 +768,39 @@ export const scoring = {
     return data as DeliveryRow;
   },
 
+  /**
+   * Remove a delivery recorded by mistake, and log why.
+   *
+   * The innings is re-derived from what remains, so removing a ball from three
+   * overs ago is safe: nothing downstream is stored, it is all folded from the
+   * delivery list.
+   */
+  async deleteDelivery(
+    deliveryId: string,
+    context: { matchId: string; userId: string; reason: string },
+  ) {
+    const { data: before, error: readError } = await supabase
+      .from('deliveries')
+      .select('*')
+      .eq('id', deliveryId)
+      .single();
+    if (readError) throw readError;
+
+    const { error: removeError } = await supabase.from('deliveries').delete().eq('id', deliveryId);
+    if (removeError) throw removeError;
+
+    const { error } = await supabase.from('score_corrections').insert({
+      match_id: context.matchId,
+      delivery_id: deliveryId,
+      action: 'delete',
+      before_state: before,
+      after_state: null,
+      reason: context.reason,
+      performed_by: context.userId,
+    });
+    if (error) throw error;
+  },
+
   async correctDelivery(
     deliveryId: string,
     patch: Partial<DeliveryRow>,
@@ -1376,5 +1409,38 @@ export const squads = {
   async removeTeam(teamId: string): Promise<void> {
     const { error } = await supabase.rpc('remove_team', { team: teamId });
     if (error) throw error;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// The correction log
+// ---------------------------------------------------------------------------
+
+export const corrections = {
+  /**
+   * Every change made to this match's scoring, newest first.
+   *
+   * Readable by anyone who can read the match — which is the point. A scorer
+   * fixing a mistake should be visible to both teams and to anyone following,
+   * because a silently altered score is indistinguishable from a dishonest one.
+   */
+  async forMatch(matchId: string) {
+    return unwrap(
+      await supabase
+        .from('score_corrections')
+        .select('*, profiles:performed_by(full_name)')
+        .eq('match_id', matchId)
+        .order('created_at', { ascending: false }),
+    );
+  },
+
+  /** How many corrections a match has had, for a badge. */
+  async countForMatch(matchId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('score_corrections')
+      .select('id', { count: 'exact', head: true })
+      .eq('match_id', matchId);
+    if (error) throw error;
+    return count ?? 0;
   },
 };
