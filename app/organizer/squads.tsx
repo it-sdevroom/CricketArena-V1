@@ -17,7 +17,9 @@ import {
   Section,
   Segmented,
 } from '@/components/UI';
+import { PhotoField } from '@/components/PhotoField';
 import { C } from '@/constants/theme';
+import { uploadTeamLogo } from '@/src/lib/storage';
 import { players, teams, tournaments } from '@/src/data/repo';
 import { useAuth } from '@/src/store/auth';
 import { describeError } from '@/src/lib/supabase';
@@ -83,6 +85,7 @@ function TeamsPanel({ organizationId }: { organizationId: string }) {
   const [shortName, setShortName] = useState('');
   const [color, setColor] = useState(COLORS[0]);
   const [busy, setBusy] = useState(false);
+  const [logo, setLogo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const list = useQuery({ queryKey: ['teams', organizationId], queryFn: () => teams.list(organizationId) });
@@ -92,15 +95,26 @@ function TeamsPanel({ organizationId }: { organizationId: string }) {
     setBusy(true);
     setError(null);
     try {
+      // Upload first: a team row with a broken logo URL is worse than one
+      // created a second later.
+      let logoUrl: string | null = null;
+      if (logo && !logo.startsWith('http')) {
+        logoUrl = await uploadTeamLogo(organizationId, logo);
+      } else if (logo) {
+        logoUrl = logo;
+      }
+
       await teams.create({
         organization_id: organizationId,
         name: name.trim(),
         short_name: shortName.trim().toUpperCase() || name.trim().slice(0, 3).toUpperCase(),
         primary_color: color,
+        logo_url: logoUrl,
       });
       await queryClient.invalidateQueries({ queryKey: ['teams', organizationId] });
       setName('');
       setShortName('');
+      setLogo(null);
       setAdding(false);
     } catch (e) {
       setError(describeError(e));
@@ -127,6 +141,15 @@ function TeamsPanel({ organizationId }: { organizationId: string }) {
       {adding ? (
         <Card style={s.form}>
           <Text style={s.formTitle}>New team</Text>
+          <PhotoField
+            label="TEAM CREST"
+            value={logo}
+            onChange={setLogo}
+            onError={setError}
+            shape="square"
+            busy={busy}
+            hint="Optional. Shown on fixtures, the points table and scorecards."
+          />
           <Input label="TEAM NAME" value={name} onChangeText={setName} placeholder="Riyadh Falcons" />
           <Input
             label="SHORT NAME"

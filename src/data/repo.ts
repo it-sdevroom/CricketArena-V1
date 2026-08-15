@@ -230,6 +230,7 @@ export const teams = {
     short_name: string;
     primary_color?: string;
     home_venue_id?: string | null;
+    logo_url?: string | null;
   }): Promise<TeamRow> {
     return unwrap(await supabase.from('teams').insert(input).select('*').single());
   },
