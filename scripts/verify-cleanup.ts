@@ -75,6 +75,31 @@ async function main() {
   }
   console.log('  ok     every demo row is gone');
 
+  // The failure the user actually hit: a database a migration or two behind,
+  // where `media` does not exist yet. DROP THE LATER TABLES and clean again.
+  {
+    const db2 = new PGlite();
+    await db2.exec(STUBS);
+    for (const f of (await readdir(dir)).filter((x) => x.endsWith('.sql')).sort()) {
+      await db2.exec(await readFile(`${dir}/${f}`, 'utf8'));
+    }
+    await db2.exec(await readFile(`${ROOT}/supabase/seed.sql`, 'utf8'));
+    await db2.exec('drop table if exists media cascade; drop table if exists match_interruptions cascade;');
+    try {
+      await db2.exec(await readFile(`${ROOT}/supabase/remove-demo-data.sql`, 'utf8'));
+      console.log('  ok     works on a database missing later tables');
+    } catch (error: any) {
+      console.error('  FAIL   partially-migrated database:', error.message);
+      process.exit(1);
+    }
+    const left = await db2.query<any>('select count(*)::int as n from players');
+    if (left.rows[0].n !== 0) {
+      console.error('  FAIL   players survived on the partial database');
+      process.exit(1);
+    }
+    await db2.close();
+  }
+
   // Re-running must not error.
   await db.exec(await readFile(`${ROOT}/supabase/remove-demo-data.sql`, 'utf8'));
   console.log('  ok     safe to run twice');

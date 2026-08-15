@@ -43,13 +43,20 @@ begin
   get diagnostics n_deliveries = row_count;
 
   delete from score_corrections where match_id in (select id from _demo_matches);
-  delete from match_interruptions where match_id in (select id from _demo_matches);
+
+  -- match_interruptions and media arrive in later migrations. A database that
+  -- has not caught up should still be cleanable, so only touch them if present.
+  if to_regclass('public.match_interruptions') is not null then
+    execute 'delete from match_interruptions where match_id in (select id from _demo_matches)';
+  end if;
 
   -- 2. Innings, and everything else hanging off a match.
   delete from innings where id in (select id from _demo_innings);
   delete from playing_xi where match_id in (select id from _demo_matches);
   delete from match_officials where match_id in (select id from _demo_matches);
-  delete from media where match_id in (select id from _demo_matches);
+  if to_regclass('public.media') is not null then
+    execute 'delete from media where match_id in (select id from _demo_matches)';
+  end if;
 
   -- 3. The matches themselves.
   delete from matches where id in (select id from _demo_matches);
@@ -61,15 +68,26 @@ begin
   delete from messages
     where channel_id in (select id from channels where organization_id = org_id);
   delete from channels where organization_id = org_id;
-  delete from media where tournament_id in (select id from tournaments where organization_id = org_id);
-  delete from player_registrations where organization_id = org_id;
+  if to_regclass('public.media') is not null then
+    execute format(
+      'delete from media where tournament_id in (select id from tournaments where organization_id = %L)',
+      org_id);
+  end if;
+
+  if to_regclass('public.player_registrations') is not null then
+    execute format('delete from player_registrations where organization_id = %L', org_id);
+  end if;
 
   delete from tournaments where organization_id = org_id;
   get diagnostics n_tournaments = row_count;
 
   -- 5. Squads, then the players they pointed at.
-  delete from follows where player_id in (select id from players where organization_id = org_id);
-  delete from follows where team_id in (select id from teams where organization_id = org_id);
+  if to_regclass('public.follows') is not null then
+    execute format(
+      'delete from follows where player_id in (select id from players where organization_id = %L)
+         or team_id in (select id from teams where organization_id = %L)',
+      org_id, org_id);
+  end if;
   delete from team_members
     where team_id in (select id from teams where organization_id = org_id);
 

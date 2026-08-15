@@ -164,7 +164,14 @@ export default function More() {
         <MenuItem
           icon="notifications-outline"
           label="Notifications"
+          detail="What you have been told about"
           onPress={() => router.push('/notifications')}
+        />
+        <MenuItem
+          icon="options-outline"
+          label="Notification settings"
+          detail="Choose what is worth interrupting you for"
+          onPress={() => router.push('/notification-settings')}
         />
       </Section>
 
