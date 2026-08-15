@@ -92,6 +92,7 @@ const config: ExpoConfig = {
   plugins: [
     'expo-router',
     'expo-secure-store',
+    'expo-font',
     [
       'expo-image-picker',
       {

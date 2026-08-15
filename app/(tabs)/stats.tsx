@@ -32,7 +32,7 @@ export default function Stats() {
   const active = board === 'batting' ? batting : bowling;
 
   return (
-    <Screen refreshing={active.isFetching} onRefresh={() => void active.refetch()}>
+    <Screen safeTop refreshing={active.isFetching} onRefresh={() => void active.refetch()}>
       <Text style={s.title}>Statistics</Text>
 
       <Segmented

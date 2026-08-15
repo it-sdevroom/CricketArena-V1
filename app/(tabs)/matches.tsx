@@ -32,7 +32,7 @@ export default function Matches() {
       : list;
 
   return (
-    <Screen refreshing={query.isFetching} onRefresh={() => void query.refetch()}>
+    <Screen safeTop refreshing={query.isFetching} onRefresh={() => void query.refetch()}>
       <Text style={s.title}>Matches</Text>
 
       <Segmented

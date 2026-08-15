@@ -32,7 +32,7 @@ export default function Tournaments() {
   const query = useQuery({ queryKey: ['tournaments'], queryFn: () => tournaments.list() });
 
   return (
-    <Screen refreshing={query.isFetching} onRefresh={() => void query.refetch()}>
+    <Screen safeTop refreshing={query.isFetching} onRefresh={() => void query.refetch()}>
       <View style={s.head}>
         <Text style={s.title}>Tournaments</Text>
         {can.manageTournaments ? (

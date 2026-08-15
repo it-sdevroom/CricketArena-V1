@@ -42,7 +42,7 @@ export default function More() {
   };
 
   return (
-    <Screen>
+    <Screen safeTop>
       <Text style={s.title}>More</Text>
 
       {user ? (

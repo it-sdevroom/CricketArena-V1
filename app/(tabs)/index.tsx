@@ -59,7 +59,7 @@ export default function Home() {
   ];
 
   return (
-    <Screen refreshing={live.isFetching} onRefresh={refresh}>
+    <Screen safeTop refreshing={live.isFetching} onRefresh={refresh}>
       <View style={s.top}>
         <View style={s.flex}>
           <Text style={s.eyebrow}>MATCHDAY CONTROL</Text>

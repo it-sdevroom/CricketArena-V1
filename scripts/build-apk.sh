@@ -70,7 +70,7 @@ fi
 # So we make sure a real JDK 17 exists up front. ~/.jdks is one of the
 # locations Gradle auto-detects, so simply unpacking it there is enough; no
 # gradle.properties entry is needed and it survives `expo prebuild`.
-JDK17_DIR=$(find "$HOME/.jdks" -maxdepth 1 -type d -name "jdk-17*" 2>/dev/null | head -1)
+JDK17_DIR=$(find "$HOME/.jdks" -maxdepth 1 -type d \( -name "*jdk*17*" -o -name "*corretto*17*" \) 2>/dev/null | head -1)
 
 if [ -z "$JDK17_DIR" ]; then
   echo "JDK 17 not found in ~/.jdks — fetching it (about 180 MB, resumable)."
@@ -99,7 +99,7 @@ if [ -z "$JDK17_DIR" ]; then
       fi
     done )
 
-  JDK17_DIR=$(find "$HOME/.jdks" -maxdepth 1 -type d \( -name "jdk-17*" -o -name "*corretto-17*" \) | head -1)
+  JDK17_DIR=$(find "$HOME/.jdks" -maxdepth 1 -type d \( -name "*jdk*17*" -o -name "*corretto*17*" \) | head -1)
 fi
 
 if [ -z "$JDK17_DIR" ]; then

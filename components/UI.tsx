@@ -23,6 +23,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { C } from '@/constants/theme';
 
 type Tone = 'green' | 'red' | 'amber' | 'blue' | 'muted' | 'lime';
@@ -46,6 +48,7 @@ export function Screen({
   refreshing,
   onRefresh,
   padded = true,
+  safeTop = false,
   style,
 }: {
   children: ReactNode;
@@ -53,15 +56,23 @@ export function Screen({
   refreshing?: boolean;
   onRefresh?: () => void;
   padded?: boolean;
+  /**
+   * Pad past the status bar. Tab screens hide the navigation header, so nothing
+   * else reserves that space and content would draw underneath the clock.
+   * Stack screens have a header that already handles the inset.
+   */
+  safeTop?: boolean;
   style?: ViewStyle;
 }) {
+  const insets = useSafeAreaInsets();
+  const topPad = safeTop ? { paddingTop: insets.top + 8 } : null;
   if (!scroll) {
-    return <View style={[s.screen, padded && s.screenPad, style]}>{children}</View>;
+    return <View style={[s.screen, padded && s.screenPad, topPad, style]}>{children}</View>;
   }
   return (
     <ScrollView
       style={s.screenBg}
-      contentContainerStyle={[s.screenPad, s.screenScroll, style]}
+      contentContainerStyle={[s.screenPad, s.screenScroll, topPad, style]}
       refreshControl={
         onRefresh ? (
           <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={C.green} />
