@@ -6,7 +6,12 @@
 import { PGlite } from '@electric-sql/pglite';
 import { readFile, readdir } from 'node:fs/promises';
 
-const ROOT = 'F:/Projects/Cricket/CricketArena-Mobile-App-v2/CricketArena';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Resolved from this file, not hardcoded: the same script has to run on a
+// Windows desktop and on a Linux CI runner.
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const STUBS = `
 create schema if not exists auth;
