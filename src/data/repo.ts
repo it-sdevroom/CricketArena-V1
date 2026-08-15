@@ -1175,3 +1175,113 @@ export const media = {
     if (error) throw error;
   },
 };
+
+// ---------------------------------------------------------------------------
+// Rain, reduced overs and revised targets
+// ---------------------------------------------------------------------------
+
+export const interruptions = {
+  async forMatch(matchId: string) {
+    return unwrap(
+      await supabase
+        .from('match_interruptions')
+        .select('*')
+        .eq('match_id', matchId)
+        .order('created_at', { ascending: false }),
+    );
+  },
+
+  /**
+   * Cut an innings short and set a revised target.
+   *
+   * Both the new numbers and the reason are written together: an unexplained
+   * revised target is how disputes start, so the audit row is not optional.
+   */
+  async applyRevision(input: {
+    matchId: string;
+    inningsId: string;
+    kind: string;
+    oversAfter: number | null;
+    targetAfter: number | null;
+    oversBefore: number | null;
+    targetBefore: number | null;
+    runsAtStop: number;
+    wicketsAtStop: number;
+    ballsAtStop: number;
+    note?: string | null;
+    method?: 'manual' | 'dls' | 'vjd' | 'none';
+    userId: string;
+  }) {
+    const { error: inningsError } = await supabase
+      .from('innings')
+      .update({
+        reduced_overs: input.oversAfter,
+        revised_target: input.targetAfter,
+        target: input.targetAfter ?? undefined,
+      })
+      .eq('id', input.inningsId);
+    if (inningsError) throw inningsError;
+
+    return unwrap(
+      await supabase
+        .from('match_interruptions')
+        .insert({
+          match_id: input.matchId,
+          innings_id: input.inningsId,
+          kind: input.kind,
+          runs_at_stop: input.runsAtStop,
+          wickets_at_stop: input.wicketsAtStop,
+          balls_at_stop: input.ballsAtStop,
+          overs_before: input.oversBefore,
+          overs_after: input.oversAfter,
+          target_before: input.targetBefore,
+          target_after: input.targetAfter,
+          note: input.note ?? null,
+          method: input.method ?? 'manual',
+          decided_by: input.userId,
+        })
+        .select('*')
+        .single(),
+    );
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Push notifications
+// ---------------------------------------------------------------------------
+
+export const push = {
+  /** Store this device's Expo token so the server can reach it. */
+  async registerToken(token: string, platform?: string) {
+    const { error } = await supabase.rpc('register_push_token', {
+      token,
+      device_platform: platform ?? null,
+    });
+    if (error) throw error;
+  },
+
+  async removeToken(token: string) {
+    const { error } = await supabase.from('device_sessions').delete().eq('expo_push_token', token);
+    if (error) throw error;
+  },
+
+  async getPreferences(userId: string) {
+    const { data, error } = await supabase
+      .from('notification_preferences')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async savePreferences(userId: string, patch: Record<string, unknown>) {
+    return unwrap(
+      await supabase
+        .from('notification_preferences')
+        .upsert({ user_id: userId, ...patch, updated_at: new Date().toISOString() })
+        .select('*')
+        .single(),
+    );
+  },
+};

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BallChip, Button, Card, ChipGroup, ErrorNotice, Loading, Pill, Screen } from '@/components/UI';
+import { RainDialog } from '@/components/RainDialog';
 import { C } from '@/constants/theme';
 import { DISMISSAL_OPTIONS, deliveryLabel } from '@/src/data/mappers';
 import { newIdempotencyKey } from '@/src/data/queue';
@@ -40,6 +41,7 @@ export default function ScoringConsole() {
 
   const [extraMode, setExtraMode] = useState<ExtraMode>('none');
   const [wicketOpen, setWicketOpen] = useState(false);
+  const [rainOpen, setRainOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -571,6 +573,12 @@ export default function ScoringConsole() {
             />
             <Button title="End innings" secondary icon="flag-outline" onPress={endInnings} />
             <Button
+              title="Rain / stoppage"
+              secondary
+              icon="rainy-outline"
+              onPress={() => setRainOpen(true)}
+            />
+            <Button
               title="Back to match centre"
               secondary
               icon="stats-chart-outline"
@@ -579,6 +587,17 @@ export default function ScoringConsole() {
           </View>
         </>
       )}
+      <RainDialog
+        visible={rainOpen}
+        onClose={() => setRainOpen(false)}
+        onApplied={() => live.refetch()}
+        matchId={match.id}
+        inningsId={innings.id}
+        state={state}
+        rules={rules}
+        currentMaxOvers={maxOvers}
+        userId={user?.id ?? ''}
+      />
     </ScrollView>
   );
 }

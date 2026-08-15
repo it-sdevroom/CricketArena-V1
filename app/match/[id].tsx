@@ -19,6 +19,7 @@ import {
   Segmented,
 } from '@/components/UI';
 import { Commentary } from '@/components/Commentary';
+import { shareScorecard } from '@/src/lib/scorecard-pdf';
 import { C } from '@/constants/theme';
 import { deliveryLabel, dismissalText } from '@/src/data/mappers';
 import { matches } from '@/src/data/repo';
@@ -146,6 +147,27 @@ export default function MatchCentre() {
           secondary
           onPress={() => router.push(`/highlights/${match.id}`)}
         />
+
+        {live.states.length ? (
+          <Button
+            title="Share scorecard (PDF)"
+            icon="document-text-outline"
+            secondary
+            onPress={() =>
+              void shareScorecard({
+                matchLabel: `${teamName(match.home_team_id)} v ${teamName(match.away_team_id)}`,
+                tournamentName: summary.data?.tournament_id ? match.label : null,
+                venueName: summary.data?.venue_name,
+                playedOn: match.scheduled_at ? matchDateLabel(match.scheduled_at) : null,
+                resultSummary: match.result_summary,
+                rules,
+                innings: live.states,
+                teamName: (id) => teamName(id),
+                playerName: (id) => nameOf(id),
+              }).catch(() => {})
+            }
+          />
+        ) : null}
       </View>
 
       <View style={s.tabs}>

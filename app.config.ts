@@ -94,6 +94,13 @@ const config: ExpoConfig = {
     'expo-secure-store',
     'expo-font',
     [
+      'expo-notifications',
+      {
+        icon: './assets/notification-icon.png',
+        color: '#20D78A',
+      },
+    ],
+    [
       'expo-image-picker',
       {
         photosPermission: 'Choose a profile photo for your player registration.',
