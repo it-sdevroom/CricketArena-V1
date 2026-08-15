@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, Text } from 'react-native';
 
-import { Button, Card, ErrorNotice, Input, Screen } from '@/components/UI';
+import { Button, Card, ErrorNotice, Input, Screen, PasswordInput } from '@/components/UI';
 import { C } from '@/constants/theme';
 import { auth } from '@/src/data/repo';
 import { describeError } from '@/src/lib/supabase';
@@ -76,11 +76,11 @@ export default function SignUp() {
           keyboardType="email-address"
           placeholder="you@example.com"
         />
-        <Input
-          label="PASSWORD"
+        <PasswordInput
+                label="PASSWORD"
           value={password}
           onChangeText={setPassword}
-          secureTextEntry
+          
           autoComplete="new-password"
           placeholder="At least 8 characters"
           error={passwordProblem}

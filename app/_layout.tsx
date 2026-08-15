@@ -1,11 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { flushQueue } from '@/src/data/queue';
+import { markActive, shouldSignOutOnLaunch } from '@/src/lib/session-policy';
+import { supabase } from '@/src/lib/supabase';
 import { AuthProvider } from '@/src/store/auth';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { C } from '@/constants/theme';
@@ -61,11 +63,46 @@ export default function RootLayout() {
   );
 }
 
+/**
+ * Honour the "sign out when the app closes" setting, if it is on.
+ *
+ * Runs once on a cold start, before anything renders, so a shared phone never
+ * flashes the previous user's data. Backgrounding is not closing: the policy
+ * allows a short grace period so a phone call does not sign a scorer out.
+ */
+function useSessionPolicy(onResolved: () => void) {
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        if (await shouldSignOutOnLaunch()) {
+          await supabase.auth.signOut();
+        }
+      } catch {
+        // A failure here must not stop the app starting.
+      } finally {
+        await markActive();
+        if (!cancelled) onResolved();
+      }
+    })();
+
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' || state === 'background') void markActive();
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
+  }, [onResolved]);
+}
+
 function App() {
   useQueueDrain();
   const [ready, setReady] = useState(false);
 
-  useEffect(() => setReady(true), []);
+  useSessionPolicy(useCallback(() => setReady(true), []));
   if (!ready) return null;
 
   return (

@@ -6,7 +6,7 @@
  * and the score furniture used across the match centre and scoring console.
  */
 
-import { ReactNode, forwardRef } from 'react';
+import { ReactNode, forwardRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -253,6 +253,64 @@ export const Input = forwardRef<TextInput, TextInputProps & { label?: string; hi
 );
 Input.displayName = 'Input';
 
+/**
+ * A password field with a reveal toggle.
+ *
+ * Typing a password blind on a phone keyboard is where most failed sign-ins
+ * actually come from, so the eye is not a nicety. It defaults to hidden and
+ * never reveals on its own.
+ */
+export function PasswordInput({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  autoComplete,
+  hint,
+  error,
+  onSubmitEditing,
+}: {
+  label?: string;
+  value: string;
+  onChangeText: (next: string) => void;
+  placeholder?: string;
+  autoComplete?: TextInputProps['autoComplete'];
+  hint?: string;
+  error?: string;
+  onSubmitEditing?: () => void;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <View style={s.field}>
+      {label ? <Text style={s.label}>{label}</Text> : null}
+      <View style={s.passwordRow}>
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={C.muted}
+          secureTextEntry={!visible}
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete={autoComplete}
+          onSubmitEditing={onSubmitEditing}
+          style={[s.input, s.passwordInput, error ? s.inputError : null]}
+        />
+        <Pressable
+          onPress={() => setVisible((v) => !v)}
+          style={s.reveal}
+          hitSlop={10}
+          accessibilityLabel={visible ? 'Hide password' : 'Show password'}
+        >
+          <Ionicons name={visible ? 'eye-off-outline' : 'eye-outline'} size={19} color={C.muted} />
+        </Pressable>
+      </View>
+      {error ? <Text style={s.fieldError}>{error}</Text> : hint ? <Text style={s.hint}>{hint}</Text> : null}
+    </View>
+  );
+}
+
 /** Horizontal segmented selector. */
 export function Segmented<T extends string>({
   options,
@@ -475,6 +533,9 @@ const s = StyleSheet.create({
   btnText: { fontWeight: '900', color: '#052117' },
   btnText2: { color: C.white },
 
+  passwordRow: { position: 'relative', justifyContent: 'center' },
+  passwordInput: { paddingRight: 48 },
+  reveal: { position: 'absolute', right: 14, height: '100%', justifyContent: 'center' },
   field: { marginBottom: 14 },
   label: { color: C.muted, fontWeight: '800', fontSize: 12, marginBottom: 7, letterSpacing: 0.4 },
   input: {

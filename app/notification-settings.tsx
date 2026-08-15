@@ -8,6 +8,7 @@ import { C } from '@/constants/theme';
 import { push } from '@/src/data/repo';
 import { useAuth } from '@/src/store/auth';
 import { registerForPush } from '@/src/lib/notifications';
+import { isSignOutOnCloseEnabled, setSignOutOnClose } from '@/src/lib/session-policy';
 import { describeError } from '@/src/lib/supabase';
 
 /**
@@ -52,6 +53,11 @@ export default function NotificationSettings() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [prefs, setPrefs] = useState<Record<string, boolean>>({});
+  const [signOutOnClose, setSignOutOnCloseState] = useState(false);
+
+  useEffect(() => {
+    void isSignOutOnCloseEnabled().then(setSignOutOnCloseState);
+  }, []);
 
   const saved = useQuery({
     queryKey: ['notification-prefs', user?.id],
@@ -154,6 +160,30 @@ export default function NotificationSettings() {
               />
             </View>
           ))}
+        </Card>
+      </Section>
+
+      <Section title="Security">
+        <Card style={s.list}>
+          <View style={s.row}>
+            <View style={s.rowText}>
+              <Text style={s.rowTitle}>Sign out when the app closes</Text>
+              <Text style={s.rowDetail}>
+                For a shared or borrowed phone. Leave this off if you score matches — being
+                signed out mid-over, possibly with balls still waiting to sync, is worse than
+                the risk it guards against. Backgrounding the app for a call does not count.
+              </Text>
+            </View>
+            <Switch
+              value={signOutOnClose}
+              onValueChange={(v) => {
+                setSignOutOnCloseState(v);
+                void setSignOutOnClose(v);
+              }}
+              trackColor={{ true: C.green, false: C.line }}
+              thumbColor={C.white}
+            />
+          </View>
         </Card>
       </Section>
 

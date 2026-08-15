@@ -1,8 +1,8 @@
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, View, Pressable } from 'react-native';
 
-import { Button, Card, ErrorNotice, Input, Screen, Segmented } from '@/components/UI';
+import { Button, Card, ErrorNotice, Input, Screen, Segmented, PasswordInput } from '@/components/UI';
 import { C } from '@/constants/theme';
 import { auth } from '@/src/data/repo';
 import { describeError } from '@/src/lib/supabase';
@@ -18,6 +18,7 @@ export default function SignIn() {
   const [method, setMethod] = useState<Method>('email');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [codeSent, setCodeSent] = useState(false);
@@ -63,6 +64,32 @@ export default function SignIn() {
     }
   };
 
+  /**
+   * Send a reset link. Supabase deliberately returns success even for an
+   * address that has no account, so that this cannot be used to discover who
+   * has signed up; the message says "if that address has an account" to match.
+   */
+  const sendReset = async () => {
+    const target = email.trim();
+    if (!target) {
+      setError('Enter your email address first, then tap this again.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await auth.sendPasswordReset(target);
+      setNotice(
+        `If ${target} has an account, a reset link is on its way. It expires in an hour.`,
+      );
+    } catch (e) {
+      setError(describeError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -89,6 +116,7 @@ export default function SignIn() {
 
         <View style={s.form}>
           {error ? <ErrorNotice message={error} /> : null}
+          {notice ? <Text style={s.notice}>{notice}</Text> : null}
 
           {method === 'email' ? (
             <>
@@ -101,13 +129,12 @@ export default function SignIn() {
                 keyboardType="email-address"
                 placeholder="you@example.com"
               />
-              <Input
+              <PasswordInput
                 label="PASSWORD"
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
                 autoComplete="current-password"
-                placeholder="••••••••"
+                placeholder="Your password"
                 onSubmitEditing={submitEmail}
               />
               <Button
@@ -116,6 +143,10 @@ export default function SignIn() {
                 loading={busy}
                 disabled={!email.trim() || password.length < 6}
               />
+              <Pressable onPress={sendReset} disabled={busy} style={s.forgotRow}>
+                <Text style={s.forgot}>Forgot your password?</Text>
+              </Pressable>
+
               <View style={s.footer}>
                 <Text style={s.muted}>New here? </Text>
                 <Link href="/(auth)/sign-up" style={s.link}>
@@ -193,6 +224,9 @@ export default function SignIn() {
 }
 
 const s = StyleSheet.create({
+  forgotRow: { paddingVertical: 12, alignItems: 'center' },
+  forgot: { color: C.green, fontWeight: '800', fontSize: 13 },
+  notice: { color: C.green, fontSize: 13, lineHeight: 19, marginBottom: 12 },
   flex: { flex: 1, backgroundColor: C.bg },
   title: { color: C.white, fontSize: 27, fontWeight: '900' },
   lead: { color: C.muted, lineHeight: 21, marginTop: 8, marginBottom: 22 },
