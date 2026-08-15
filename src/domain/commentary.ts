@@ -5,9 +5,9 @@
  * the same text can be reused for a share card or a push notification later.
  *
  * The wording follows how scorers actually read a card aloud: the bowler to
- * the batter, then what happened. We have no shot descriptions — nobody is
- * typing "driven through the covers" while also counting the over — so the
- * text stays factual and lets the numbers carry it.
+ * the batter, then what happened. A scorer has seconds between deliveries, so
+ * shot descriptions are optional and chosen from presets rather than typed;
+ * when one is absent the line still reads correctly on the numbers alone.
  */
 
 import { breakdown } from './scoring';
@@ -123,6 +123,12 @@ export function describeDelivery(
       text = `${bowler} to ${striker}, OUT! ${who} ${kind} b ${bowler}`;
       tone = 'wicket';
     }
+  }
+
+  // The scorer's description, when they gave one: "FOUR, driven through the
+  // covers" reads like commentary; "FOUR" alone reads like a spreadsheet.
+  if (d.shot) {
+    text = `${text}, ${d.shot}`;
   }
 
   if (d.freeHit && !d.wicket) {

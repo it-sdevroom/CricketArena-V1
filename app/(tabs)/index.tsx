@@ -9,7 +9,6 @@ import {
   Card,
   EmptyState,
   ErrorNotice,
-  Hero,
   Loading,
   Pill,
   Screen,
@@ -76,12 +75,6 @@ export default function Home() {
           <Ionicons name="notifications-outline" color={C.lime} size={21} />
         </Pressable>
       </View>
-
-      <Hero
-        eyebrow={activeLeague?.name.toUpperCase() ?? 'CRICKET ARENA'}
-        title="Run the whole tournament from one app."
-        subtitle="Score every ball, publish fixtures, manage squads and keep fans on the live table."
-      />
 
       {error ? <ErrorNotice message={describeError(error)} onRetry={refresh} /> : null}
 

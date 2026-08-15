@@ -257,6 +257,7 @@ export interface DeliveryRow {
   player_out_id: string | null;
   fielder_id: string | null;
   free_hit: boolean;
+  shot: string | null;
   is_legal: boolean;
   total_runs: number;
   bowler_runs: number;

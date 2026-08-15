@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, Pill, Screen, Section } from '@/components/UI';
 import { C } from '@/constants/theme';
@@ -48,11 +48,15 @@ export default function More() {
       {user ? (
         <Pressable onPress={() => router.push('/profile')} style={({ pressed }) => pressed && s.pressed}>
           <Card style={s.profileCard}>
-            <View style={s.avatar}>
-              <Text style={s.initials}>
-                {(profile?.full_name || user.email || '?').slice(0, 1).toUpperCase()}
-              </Text>
-            </View>
+            {profile?.avatar_url ? (
+              <Image source={{ uri: profile.avatar_url }} style={s.avatar} />
+            ) : (
+              <View style={s.avatar}>
+                <Text style={s.initials}>
+                  {(profile?.full_name || user.email || '?').slice(0, 1).toUpperCase()}
+                </Text>
+              </View>
+            )}
             <View style={s.flex}>
               <Text style={s.profileName} numberOfLines={1}>
                 {profile?.full_name || 'Your profile'}

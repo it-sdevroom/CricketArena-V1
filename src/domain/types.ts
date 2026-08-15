@@ -84,6 +84,8 @@ export interface Delivery {
   wicket?: Wicket | null;
   /** Set when the delivery was bowled under a free hit. Derived, stored for audit. */
   freeHit?: boolean | null;
+  /** Optional description of the shot, e.g. "driven through the covers". */
+  shot?: string | null;
   /** Client-generated key so a retried offline sync cannot double-count. */
   idempotencyKey?: string;
   createdAt?: string;

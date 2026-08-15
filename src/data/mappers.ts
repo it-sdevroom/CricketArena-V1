@@ -68,6 +68,7 @@ export function toDelivery(row: DeliveryRow, rules: MatchRules): Delivery {
         }
       : null,
     freeHit: row.free_hit,
+    shot: row.shot,
     idempotencyKey: row.idempotency_key,
     createdAt: row.created_at,
   };
@@ -89,6 +90,7 @@ export interface DeliveryInsert {
   player_out_id: string | null;
   fielder_id: string | null;
   free_hit: boolean;
+  shot: string | null;
   idempotency_key: string;
 }
 
@@ -115,6 +117,7 @@ export function toDeliveryInsert(
     player_out_id: delivery.wicket?.playerOutId ?? null,
     fielder_id: delivery.wicket?.fielderId ?? null,
     free_hit: delivery.freeHit ?? false,
+    shot: delivery.shot ?? null,
     idempotency_key: delivery.idempotencyKey as string,
   };
 }

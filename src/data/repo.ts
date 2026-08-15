@@ -1286,3 +1286,95 @@ export const push = {
     );
   },
 };
+
+// ---------------------------------------------------------------------------
+// Squad management
+// ---------------------------------------------------------------------------
+
+export const squads = {
+  /** Everyone in a team, retired players excluded. */
+  async forTeam(teamId: string) {
+    return unwrap(
+      await supabase
+        .from('active_squad')
+        .select('*')
+        .eq('team_id', teamId)
+        .order('jersey_number', { nullsFirst: false }),
+    );
+  },
+
+  /** Players in this organisation who are not yet in the given team. */
+  async availableFor(organizationId: string, teamId: string) {
+    const [all, inTeam] = await Promise.all([
+      supabase.from('players').select('*').eq('organization_id', organizationId).eq('active', true),
+      supabase.from('team_members').select('player_id').eq('team_id', teamId),
+    ]);
+    if (all.error) throw all.error;
+    if (inTeam.error) throw inTeam.error;
+
+    const taken = new Set((inTeam.data ?? []).map((r: any) => r.player_id));
+    return (all.data ?? []).filter((p: any) => !taken.has(p.id));
+  },
+
+  async add(teamId: string, playerId: string) {
+    const { error } = await supabase
+      .from('team_members')
+      .upsert({ team_id: teamId, player_id: playerId });
+    if (error) throw error;
+  },
+
+  async remove(teamId: string, playerId: string) {
+    const { error } = await supabase
+      .from('team_members')
+      .delete()
+      .eq('team_id', teamId)
+      .eq('player_id', playerId);
+    if (error) throw error;
+  },
+
+  /**
+   * Set the captain. A partial unique index allows only one per team, so the
+   * previous captain has to stand down in the same breath.
+   */
+  async setCaptain(teamId: string, playerId: string) {
+    const { error: clear } = await supabase
+      .from('team_members')
+      .update({ is_captain: false })
+      .eq('team_id', teamId)
+      .eq('is_captain', true);
+    if (clear) throw clear;
+
+    const { error } = await supabase
+      .from('team_members')
+      .update({ is_captain: true })
+      .eq('team_id', teamId)
+      .eq('player_id', playerId);
+    if (error) throw error;
+  },
+
+  async setRole(
+    teamId: string,
+    playerId: string,
+    patch: { is_vice_captain?: boolean; is_wicket_keeper?: boolean },
+  ) {
+    const { error } = await supabase
+      .from('team_members')
+      .update(patch)
+      .eq('team_id', teamId)
+      .eq('player_id', playerId);
+    if (error) throw error;
+  },
+
+  /** Delete if they never played, retire if they did. Returns which happened. */
+  async removePlayer(playerId: string): Promise<'deleted' | 'retired'> {
+    const { data, error } = await supabase.rpc('remove_player', { player: playerId });
+    if (error) throw error;
+    return data as 'deleted' | 'retired';
+  },
+
+  /** Only possible while the team has never taken the field. */
+  async removeTeam(teamId: string): Promise<void> {
+    const { error } = await supabase.rpc('remove_team', { team: teamId });
+    if (error) throw error;
+  },
+};

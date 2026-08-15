@@ -190,7 +190,7 @@ function TeamsPanel({ organizationId }: { organizationId: string }) {
                   title={team.name}
                   subtitle={team.short_name}
                   leadingColor={team.primary_color}
-                  onPress={() => router.push(`/team/${team.id}`)}
+                  onPress={() => router.push(`/organizer/team/${team.id}`)}
                 />
                 {activeLeague ? (
                   <Pressable onPress={() => void register(team.id, activeLeague.id)} hitSlop={8} style={s.register}>
