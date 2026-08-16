@@ -40,7 +40,9 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
+      # No setup-android step: the ubuntu runners already ship the Android SDK
+      # with platforms and build-tools, and ANDROID_HOME already set. The action
+      # only duplicated that, and failed doing it.
 
       - run: npm ci
 
