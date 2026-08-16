@@ -128,7 +128,10 @@ const config: ExpoConfig = {
   extra: {
     eas: {
       // Filled in by `eas init`. Left null so the config is valid before then.
-      projectId: process.env.EAS_PROJECT_ID ?? undefined,
+      // Created with `eas project:init`. Expo mints push tokens against this,
+      // so without it getExpoPushTokenAsync has nothing to mint against.
+      // Not a secret — it identifies the project, it does not authorise anything.
+      projectId: process.env.EAS_PROJECT_ID ?? 'c4797c98-34f6-4b77-a22e-02295731c18d',
     },
   },
 };
