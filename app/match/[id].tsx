@@ -19,6 +19,8 @@ import {
   Segmented,
 } from '@/components/UI';
 import { Commentary } from '@/components/Commentary';
+import { CountUp, LivePulse } from '@/components/Motion';
+import { SkeletonList, SkeletonMatchCard, SkeletonPlayerRow } from '@/components/Skeleton';
 import { shareScorecard } from '@/src/lib/scorecard-pdf';
 import { C } from '@/constants/theme';
 import { deliveryLabel, dismissalText } from '@/src/data/mappers';
@@ -60,7 +62,15 @@ export default function MatchCentre() {
     return byTeam.size >= 2;
   }, [live.squads]);
 
-  if (live.loading) return <Loading label="Loading match…" />;
+  if (live.loading) {
+    return (
+      <Screen>
+        <SkeletonMatchCard />
+        <View style={{ height: 20 }} />
+        <SkeletonList count={4}>{() => <SkeletonPlayerRow />}</SkeletonList>
+      </Screen>
+    );
+  }
   if (live.error || !live.match) {
     return (
       <Screen>
@@ -83,7 +93,10 @@ export default function MatchCentre() {
             {match.label ?? 'Match'}
           </Text>
           {isLive ? (
-            <Pill text="● LIVE" tone="red" />
+            <View style={s.liveRow}>
+              <LivePulse />
+              <Pill text="LIVE" tone="red" />
+            </View>
           ) : match.status === 'completed' ? (
             <Pill text="COMPLETED" tone="muted" />
           ) : (
@@ -97,9 +110,10 @@ export default function MatchCentre() {
               <Text style={s.inningsTeam} numberOfLines={1}>
                 {teamName(state.battingTeamId)}
               </Text>
-              <Text style={s.inningsScore}>
-                {state.runs}/{state.wickets}
-              </Text>
+              <View style={s.scoreRow}>
+                <CountUp value={state.runs} style={s.inningsScore} />
+                <Text style={s.inningsScore}>/{state.wickets}</Text>
+              </View>
               <Text style={s.inningsOvers}>
                 ({formatOvers(state.legalBalls, rules.ballsPerOver)})
               </Text>
@@ -510,6 +524,8 @@ function InfoTab({ match, summary }: { match: any; summary: any }) {
 }
 
 const s = StyleSheet.create({
+  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  scoreRow: { flexDirection: 'row', alignItems: 'baseline' },
   viewerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
   viewerText: { color: C.muted, fontSize: 12 },
   viewerLive: { color: C.green, fontWeight: '700' },

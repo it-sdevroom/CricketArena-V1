@@ -15,6 +15,7 @@ import {
   Section,
   StatTile,
 } from '@/components/UI';
+import { SkeletonList, SkeletonMatchCard } from '@/components/Skeleton';
 import { C } from '@/constants/theme';
 import { matches, tournaments } from '@/src/data/repo';
 import { useAuth } from '@/src/store/auth';

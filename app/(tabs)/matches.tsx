@@ -4,6 +4,8 @@ import { StyleSheet, Text } from 'react-native';
 
 import { MatchCard } from '@/components/MatchCard';
 import { EmptyState, ErrorNotice, Loading, Screen, Segmented } from '@/components/UI';
+import { FadeIn } from '@/components/Motion';
+import { SkeletonList, SkeletonMatchCard } from '@/components/Skeleton';
 import { C } from '@/constants/theme';
 import { matches } from '@/src/data/repo';
 import { describeError } from '@/src/lib/supabase';
@@ -54,7 +56,11 @@ export default function Matches() {
       ) : query.isLoading ? (
         <Loading />
       ) : ordered.length ? (
-        ordered.map((match) => <MatchCard key={match.match_id} match={match} />)
+        ordered.map((match, i) => (
+          <FadeIn key={match.match_id} index={i}>
+            <MatchCard match={match} />
+          </FadeIn>
+        ))
       ) : (
         <EmptyState
           icon={filter === 'live' ? 'radio-outline' : filter === 'upcoming' ? 'calendar-outline' : 'trophy-outline'}
