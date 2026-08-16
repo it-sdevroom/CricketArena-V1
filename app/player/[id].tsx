@@ -1,14 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
-import { useLocalSearchParams } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
+import { StyleSheet, Text, View, Image } from 'react-native';
 
 import { FollowButton } from '@/components/FollowButton';
-import { Card, EmptyState, ErrorNotice, Loading, Pill, Screen, Section, StatTile } from '@/components/UI';
+import { Card, EmptyState, ErrorNotice, Loading, Pill, Screen, Section, StatTile, Button } from '@/components/UI';
 import { C } from '@/constants/theme';
+import { useAuth } from '@/src/store/auth';
 import { players, stats } from '@/src/data/repo';
 import { formatOvers } from '@/src/domain/scoring';
 
 export default function PlayerDetail() {
+  const { can } = useAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const player = useQuery({ queryKey: ['player', id], queryFn: () => players.get(id as string), enabled: !!id });
@@ -74,7 +76,11 @@ export default function PlayerDetail() {
     <Screen>
       <Card style={s.header}>
         <View style={s.avatar}>
-          <Text style={s.initials}>{p.full_name.slice(0, 1).toUpperCase()}</Text>
+          {p.photo_url ? (
+            <Image source={{ uri: p.photo_url }} style={s.avatarImage} />
+          ) : (
+            <Text style={s.initials}>{p.full_name.slice(0, 1).toUpperCase()}</Text>
+          )}
         </View>
         <Text style={s.name}>{p.display_name || p.full_name}</Text>
         <View style={s.chips}>
@@ -86,6 +92,15 @@ export default function PlayerDetail() {
         </View>
         <FollowButton target={{ playerId: p.id }} />
       </Card>
+
+      {can.manageTournaments ? (
+        <Button
+          title="Edit this player"
+          icon="create-outline"
+          secondary
+          onPress={() => router.push(`/organizer/edit-player/${p.id}`)}
+        />
+      ) : null}
 
       {!hasPlayed ? (
         <EmptyState
@@ -146,6 +161,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 const s = StyleSheet.create({
   header: { alignItems: 'center', gap: 12 },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 999 },
   avatar: {
     width: 66,
     height: 66,
