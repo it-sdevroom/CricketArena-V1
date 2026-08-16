@@ -148,6 +148,15 @@ export default function MatchCentre() {
           onPress={() => router.push(`/highlights/${match.id}`)}
         />
 
+        {canScore && match.status === 'completed' ? (
+          <Button
+            title="Type up the scorecard"
+            icon="create-outline"
+            secondary
+            onPress={() => router.push(`/organizer/enter-card/${match.id}`)}
+          />
+        ) : null}
+
         <Button
           title={canScore ? 'Corrections' : 'Score changes'}
           icon="shield-checkmark-outline"

@@ -135,6 +135,7 @@ function App() {
             <Stack.Screen name="organizer/team/[id]" options={{ title: 'Manage team' }} />
             <Stack.Screen name="organizer/squads" options={{ title: 'Teams & players' }} />
             <Stack.Screen name="organizer/approvals" options={{ title: 'Player registrations' }} />
+            <Stack.Screen name="organizer/enter-card/[matchId]" options={{ title: 'Type up the card' }} />
             <Stack.Screen name="organizer/committee" options={{ title: 'Tournament committee' }} />
             <Stack.Screen name="organizer/officials" options={{ title: 'Scorers & umpires' }} />
             <Stack.Screen name="join-team" options={{ title: 'Register as a player' }} />

@@ -1489,3 +1489,88 @@ export const corrections = {
     return count ?? 0;
   },
 };
+
+// ---------------------------------------------------------------------------
+// Figures typed up from a paper card
+// ---------------------------------------------------------------------------
+
+export const performances = {
+  /** Everything entered for a match, batting and bowling together. */
+  async forMatch(matchId: string) {
+    const { data: inns, error: iErr } = await supabase
+      .from('innings')
+      .select('id')
+      .eq('match_id', matchId);
+    if (iErr) throw iErr;
+
+    const ids = (inns ?? []).map((i) => i.id);
+    if (ids.length === 0) return [];
+
+    const [bat, bowl] = await Promise.all([
+      supabase.from('summary_batting').select('*, players(full_name)').in('innings_id', ids),
+      supabase.from('summary_bowling').select('*, players(full_name)').in('innings_id', ids),
+    ]);
+    if (bat.error) throw bat.error;
+    if (bowl.error) throw bowl.error;
+
+    return [
+      ...(bat.data ?? []).map((r: any) => ({
+        ...r,
+        kind: 'batting' as const,
+        full_name: r.players?.full_name ?? 'Unknown',
+      })),
+      ...(bowl.data ?? []).map((r: any) => ({
+        ...r,
+        kind: 'bowling' as const,
+        full_name: r.players?.full_name ?? 'Unknown',
+      })),
+    ];
+  },
+
+  /** Upsert, so correcting a figure is entering it again. */
+  async saveBatting(row: {
+    innings_id: string;
+    player_id: string;
+    runs: number;
+    balls: number;
+    fours?: number;
+    sixes?: number;
+    is_out?: boolean;
+    batting_position?: number | null;
+  }) {
+    return unwrap(
+      await supabase.from('summary_batting').upsert(row).select('*').single(),
+    );
+  },
+
+  async saveBowling(row: {
+    innings_id: string;
+    player_id: string;
+    legal_balls: number;
+    runs_conceded: number;
+    wickets: number;
+    maidens?: number;
+  }) {
+    return unwrap(
+      await supabase.from('summary_bowling').upsert(row).select('*').single(),
+    );
+  },
+
+  async removeBatting(inningsId: string, playerId: string) {
+    const { error } = await supabase
+      .from('summary_batting')
+      .delete()
+      .eq('innings_id', inningsId)
+      .eq('player_id', playerId);
+    if (error) throw error;
+  },
+
+  async removeBowling(inningsId: string, playerId: string) {
+    const { error } = await supabase
+      .from('summary_bowling')
+      .delete()
+      .eq('innings_id', inningsId)
+      .eq('player_id', playerId);
+    if (error) throw error;
+  },
+};
