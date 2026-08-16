@@ -81,7 +81,7 @@ begin
     'PPP4 Summer Sport 2026',
     'ppp4-summer-sport-2026',
     '2026',
-    'custom',            -- six scheduled games, not a full round robin
+    'groups',            -- two groups of three, each a round robin
     'T20',
     'active',
     true,
@@ -93,6 +93,8 @@ begin
   )
   returning id into tour_id;
 
+  update tournaments set group_count = 2 where id = tour_id;
+
   -- Teams.
   for i in 1..6 loop
     insert into teams (organization_id, name, short_name, primary_color, home_venue_id)
@@ -100,8 +102,8 @@ begin
     returning id into tid;
     ids := ids || tid;
 
-    insert into tournament_teams (tournament_id, team_id, seed)
-    values (tour_id, tid, i);
+    insert into tournament_teams (tournament_id, team_id, seed, group_label)
+    values (tour_id, tid, i, case when i in (1, 2, 5) then 'A' else 'B' end);
   end loop;
 
   -- Fixtures, in the order and on the dates given.
@@ -110,15 +112,17 @@ begin
     insert into matches (
       tournament_id, organization_id, home_team_id, away_team_id, venue_id,
       status, stage, round, match_order, label, scheduled_at,
-      overs_per_innings, players_per_side, max_overs_per_bowler, created_by
+      overs_per_innings, players_per_side, max_overs_per_bowler, created_by,
+      group_label
     )
     values (
       tour_id, org_id,
       ids[f[1]::int], ids[f[2]::int], ground_id,
-      'scheduled', 'league', n, n,
-      'Game ' || n,
+      'scheduled', 'group', n, n,
+      'Group ' || (case when n in (1, 3, 5) then 'A' else 'B' end) || ' • Game ' || n,
       (f[3]::date)::timestamptz + interval '16 hours',
-      20, 11, 4, admin_id
+      20, 11, 4, admin_id,
+      case when n in (1, 3, 5) then 'A' else 'B' end
     );
   end loop;
 
@@ -129,7 +133,8 @@ begin
 end $$;
 
 -- Check it landed.
-select m.match_order as "game",
+select m.group_label as "group",
+       m.match_order as "game",
        to_char(m.scheduled_at, 'DD Mon (Dy)') as "date",
        h.name as "team a",
        a.name as "team b",
