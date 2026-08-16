@@ -27,6 +27,7 @@ import { chaseSummary, currentRunRate, formatOvers, requiredRunRate } from '@/sr
 import type { InningsState } from '@/src/domain/types';
 import { useAuth } from '@/src/store/auth';
 import { useLiveMatch, useNameLookup } from '@/src/store/useMatch';
+import { describeViewers, useViewers } from '@/src/store/useViewers';
 import { describeError } from '@/src/lib/supabase';
 import { XiPicker } from '@/components/XiPicker';
 
@@ -38,6 +39,7 @@ export default function MatchCentre() {
   const [tab, setTab] = useState<Tab>('live');
   const live = useLiveMatch(id);
   const nameOf = useNameLookup(live.squads);
+  const viewers = useViewers(id, live.match?.status === 'live' || live.match?.status === 'innings_break');
 
   const summary = useQuery({
     queryKey: ['match-summary', id],
@@ -119,6 +121,19 @@ export default function MatchCentre() {
               ? chaseSummary(live.currentState, rules, match.overs_per_innings)
               : summary.data?.venue_name ?? '')}
         </Text>
+
+        {describeViewers(viewers) ? (
+          <View style={s.viewerRow}>
+            <Ionicons
+              name={viewers.live > 0 ? 'eye' : 'eye-outline'}
+              size={13}
+              color={viewers.live > 0 ? C.green : C.muted}
+            />
+            <Text style={[s.viewerText, viewers.live > 0 && s.viewerLive]}>
+              {describeViewers(viewers)}
+            </Text>
+          </View>
+        ) : null}
 
         {live.pendingCount > 0 ? (
           <View style={s.pendingRow}>
@@ -495,6 +510,9 @@ function InfoTab({ match, summary }: { match: any; summary: any }) {
 }
 
 const s = StyleSheet.create({
+  viewerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  viewerText: { color: C.muted, fontSize: 12 },
+  viewerLive: { color: C.green, fontWeight: '700' },
   muted: { color: C.muted },
   dim: { color: C.muted },
   card: { marginBottom: 4 },
