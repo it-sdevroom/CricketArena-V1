@@ -15,13 +15,24 @@ import type { ExpoConfig } from 'expo/config';
 
 // A bare "/" means "served from the root" and must become undefined, not "/".
 // The deploy workflow sends "/" for user and organisation Pages sites.
+// Version comes from the git tag the release was built from, so every APK
+// reports what it actually is. Without this every build claimed 2.1.0 and
+// Android could not tell them apart — nor could anyone holding the phone.
+const tag = process.env.APP_VERSION?.replace(/^v/, '').trim();
+const version = tag && /^\d+\.\d+\.\d+$/.test(tag) ? tag : '2.1.0';
+
+// versionCode must increase with every upload Play Store ever sees, so it is
+// derived from the version rather than hand-maintained: 2.7.0 -> 20700.
+const [major, minor, patch] = version.split('.').map(Number);
+const versionCode = major * 10000 + minor * 100 + patch;
+
 const rawBaseUrl = process.env.EXPO_PUBLIC_BASE_URL?.trim();
 const baseUrl = !rawBaseUrl || rawBaseUrl === '/' ? undefined : rawBaseUrl.replace(/\/$/, '');
 
 const config: ExpoConfig = {
   name: 'Cricket Arena',
   slug: 'cricket-arena',
-  version: '2.1.0',
+  version,
   orientation: 'portrait',
   scheme: 'cricketarena',
   userInterfaceStyle: 'dark',
@@ -39,7 +50,7 @@ const config: ExpoConfig = {
     supportsTablet: true,
     bundleIdentifier: 'com.nauman.cricketarena',
     // App Store Connect requires this to increase with every upload.
-    buildNumber: '1',
+    buildNumber: String(versionCode),
     infoPlist: {
       // Live scoring is used outdoors on patchy mobile data.
       NSAppTransportSecurity: { NSAllowsArbitraryLoads: false },
@@ -56,7 +67,7 @@ const config: ExpoConfig = {
   android: {
     package: 'com.nauman.cricketarena',
     // Google Play requires this to increase with every upload.
-    versionCode: 1,
+    versionCode,
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#071A16',

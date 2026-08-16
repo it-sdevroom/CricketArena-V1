@@ -96,9 +96,20 @@ export async function registerForPush(): Promise<PushRegistration> {
     const projectId =
       Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? undefined;
 
-    const result = await Notifications.getExpoPushTokenAsync(
-      projectId ? { projectId } : undefined,
-    );
+    if (!projectId) {
+      // Expo mints push tokens against a project, so without an id there is
+      // nothing to mint. Say so plainly rather than letting the SDK throw
+      // something opaque — this is configuration, not a fault on the phone.
+      return {
+        token: null,
+        reason: 'error',
+        message:
+          'Push is not configured for this build yet. It needs a free Expo project id — ' +
+          'run `npx eas init` in the project, then rebuild. Everything else in the app works without it.',
+      };
+    }
+
+    const result = await Notifications.getExpoPushTokenAsync({ projectId });
 
     await push.registerToken(result.data, Platform.OS);
     return { token: result.data };
