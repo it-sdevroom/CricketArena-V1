@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
@@ -77,6 +77,14 @@ export default function Committee() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // People already connected to this competition, so an organiser picks from a
+  // list instead of having to know an email address by heart.
+  const candidates = useQuery({
+    queryKey: ['committee-candidates', activeOrg?.id],
+    queryFn: () => organizations.candidates(activeOrg!.id),
+    enabled: !!activeOrg,
+  });
 
   const members = useQuery({
     queryKey: ['org-members', activeOrg?.id],
@@ -209,6 +217,66 @@ export default function Committee() {
         </Card>
       </Section>
 
+      <Section title="People already here">
+        {candidates.isLoading ? (
+          <Loading />
+        ) : (candidates.data ?? []).length === 0 ? (
+          <Card style={s.form}>
+            <Text style={s.hint}>
+              Nobody else has registered with this competition yet. Once players sign up and apply
+              to a squad they appear here, and you can give them a role with one tap.
+            </Text>
+          </Card>
+        ) : (
+          <Card style={s.list}>
+            {(candidates.data ?? []).map((person, i) => (
+              <View key={person.id} style={[s.row, i > 0 && s.rowBorder]}>
+                {person.photo ? (
+                  <Image source={{ uri: person.photo }} style={s.avatar} />
+                ) : (
+                  <View style={[s.avatar, s.avatarBlank]}>
+                    <Text style={s.initial}>{person.name.slice(0, 1).toUpperCase()}</Text>
+                  </View>
+                )}
+
+                <View style={s.rowText}>
+                  <Text style={s.name}>{person.name}</Text>
+                  <Text style={s.why}>{person.why}</Text>
+                </View>
+
+                <Pressable
+                  onPress={() =>
+                    Alert.alert(
+                      `Add ${person.name}?`,
+                      `They become ${ROLES.find((r) => r.value === role)?.label}. Change the role above first if that is not right.`,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Add',
+                          onPress: async () => {
+                            try {
+                              await organizations.addMember(activeOrg.id, person.id, role);
+                              await queryClient.invalidateQueries({ queryKey: ['org-members', activeOrg.id] });
+                              await queryClient.invalidateQueries({ queryKey: ['committee-candidates', activeOrg.id] });
+                              setNotice(`${person.name} added.`);
+                            } catch (e) {
+                              setError(describeError(e));
+                            }
+                          },
+                        },
+                      ],
+                    )
+                  }
+                  hitSlop={8}
+                >
+                  <Text style={s.add}>Add</Text>
+                </Pressable>
+              </View>
+            ))}
+          </Card>
+        )}
+      </Section>
+
       <Section title={`Committee (${list.length})`}>
         {members.isLoading ? (
           <Loading />
@@ -277,6 +345,11 @@ export default function Committee() {
 }
 
 const s = StyleSheet.create({
+  avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.card2 },
+  avatarBlank: { alignItems: 'center', justifyContent: 'center' },
+  initial: { color: C.green, fontWeight: '900', fontSize: 15 },
+  why: { color: C.muted, fontSize: 12 },
+  add: { color: C.green, fontWeight: '900', fontSize: 13 },
   ok: { color: C.green, fontWeight: '800', marginBottom: 14 },
   form: { gap: 4 },
   hint: { color: C.muted, fontSize: 12, lineHeight: 18, marginBottom: 12 },

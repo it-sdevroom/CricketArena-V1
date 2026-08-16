@@ -220,6 +220,11 @@ export const organizations = {
     return this.addMember(organizationId, userId, role);
   },
 
+  /** People with a connection to this organisation who are not yet members. */
+  async candidates(organizationId: string) {
+    return committeeCandidates(organizationId);
+  },
+
   async removeMember(organizationId: string, userId: string) {
     const { error } = await supabase
       .from('organization_members')
@@ -1574,3 +1579,64 @@ export const performances = {
     if (error) throw error;
   },
 };
+
+/**
+ * People an organiser could reasonably add to the committee.
+ *
+ * Deliberately NOT everyone who has ever signed up. An organiser has no
+ * business browsing the whole platform's user list, and a picker showing
+ * strangers would be both a privacy problem and useless. This returns people
+ * who already have something to do with this organisation:
+ *
+ *   - anyone whose player record is linked to an account here
+ *   - anyone who has applied to join one of its squads
+ *
+ * Those are exactly the people a committee gets drawn from. Anyone else can
+ * still be added by typing their email, which requires knowing it already.
+ */
+export async function committeeCandidates(organizationId: string) {
+  const [linkedPlayers, applicants, existing] = await Promise.all([
+    supabase
+      .from('players')
+      .select('user_id, full_name, photo_url')
+      .eq('organization_id', organizationId)
+      .not('user_id', 'is', null),
+    supabase
+      .from('player_registrations')
+      .select('user_id, full_name, photo_url, status')
+      .eq('organization_id', organizationId),
+    supabase
+      .from('organization_members')
+      .select('user_id')
+      .eq('organization_id', organizationId),
+  ]);
+
+  if (linkedPlayers.error) throw linkedPlayers.error;
+  if (applicants.error) throw applicants.error;
+  if (existing.error) throw existing.error;
+
+  const alreadyOn = new Set((existing.data ?? []).map((m) => m.user_id));
+  const seen = new Map<string, { id: string; name: string; photo: string | null; why: string }>();
+
+  for (const p of linkedPlayers.data ?? []) {
+    if (!p.user_id || alreadyOn.has(p.user_id) || seen.has(p.user_id)) continue;
+    seen.set(p.user_id, {
+      id: p.user_id,
+      name: p.full_name,
+      photo: p.photo_url,
+      why: 'Plays here',
+    });
+  }
+
+  for (const a of applicants.data ?? []) {
+    if (!a.user_id || alreadyOn.has(a.user_id) || seen.has(a.user_id)) continue;
+    seen.set(a.user_id, {
+      id: a.user_id,
+      name: a.full_name,
+      photo: a.photo_url,
+      why: a.status === 'approved' ? 'Registered player' : 'Applied to join',
+    });
+  }
+
+  return [...seen.values()].sort((a, z) => a.name.localeCompare(z.name));
+}
