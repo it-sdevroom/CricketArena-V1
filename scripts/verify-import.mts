@@ -84,6 +84,30 @@ async function main() {
   if (c.matches !== 6) problems.push(`expected 6 fixtures, got ${c.matches}`);
   if (c.admins !== 1) problems.push(`expected 1 admin, got ${c.admins}`);
 
+  // The whole point of the results: does the table come out right?
+  const table = await db.query<any>(`
+    select group_label grp, team_short team, played p, won w, lost l,
+           points pts, net_run_rate nrr, runs_scored rs, overs_faced ov
+    from tournament_standings
+    where tournament_id = (select id from tournaments where slug='ppp4-summer-sport-2026')
+    order by group_label, points desc, net_run_rate desc`);
+
+  console.log('\n  Points table');
+  console.log('  GRP TEAM  P W L PTS      NRR   runs/overs');
+  for (const r of table.rows) {
+    console.log(`   ${r.grp}  ${String(r.team).padEnd(5)} ${r.p} ${r.w} ${r.l}  ${String(r.pts).padEnd(3)} ${String(r.nrr).padStart(7)}   ${r.rs}/${r.ov}`);
+  }
+
+  const results = await db.query<any>(`
+    select m.match_order g, m.result_summary
+    from matches m where m.result_kind is not null order by m.match_order`);
+  console.log('\n  Results');
+  results.rows.forEach((r: any) => console.log(`   Game ${r.g}: ${r.result_summary}`));
+  if (results.rows.length !== 3) {
+    console.error(`  FAIL expected 3 results, got ${results.rows.length}`);
+    process.exit(1);
+  }
+
   // Re-running must rebuild, not duplicate.
   await db.exec(sql);
   const again = await db.query<any>(`select count(*)::int n from matches`);

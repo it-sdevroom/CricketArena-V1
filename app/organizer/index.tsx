@@ -147,6 +147,13 @@ export default function OrganizerConsole() {
           onPress={() => router.push('/organizer/officials')}
           style={s.spaced}
         />
+        <Button
+          title="Tournament committee"
+          secondary
+          icon="people-circle-outline"
+          onPress={() => router.push('/organizer/committee')}
+          style={s.spaced}
+        />
       </Section>
     </Screen>
   );

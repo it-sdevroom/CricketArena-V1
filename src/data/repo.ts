@@ -184,6 +184,51 @@ export const organizations = {
       .sort((a: any, z: any) => (a.full_name ?? '').localeCompare(z.full_name ?? ''));
   },
 
+  /**
+   * Add someone to the committee by the email they signed up with.
+   *
+   * Looks them up through profiles rather than auth.users, which the client
+   * cannot read. That means they must already have an account; inviting a
+   * stranger by email would need a server-side invitation flow.
+   */
+  async addMemberByEmail(organizationId: string, email: string, role: AppRole) {
+    const { data: found, error: lookupError } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .ilike('handle', email)
+      .maybeSingle();
+
+    let userId = found?.id as string | undefined;
+
+    if (!userId) {
+      // handle is not always set; fall back to matching the auth email through
+      // the RPC, which runs with the definer's rights.
+      const { data: viaRpc, error: rpcError } = await supabase.rpc('find_profile_by_email', {
+        lookup_email: email,
+      });
+      if (rpcError) throw rpcError;
+      userId = (viaRpc as string | null) ?? undefined;
+    }
+    if (lookupError) throw lookupError;
+
+    if (!userId) {
+      throw new Error(
+        `No account found for ${email}. Ask them to sign up in the app first, then add them.`,
+      );
+    }
+
+    return this.addMember(organizationId, userId, role);
+  },
+
+  async removeMember(organizationId: string, userId: string) {
+    const { error } = await supabase
+      .from('organization_members')
+      .delete()
+      .eq('organization_id', organizationId)
+      .eq('user_id', userId);
+    if (error) throw error;
+  },
+
   async addMember(organizationId: string, userId: string, role: AppRole) {
     return unwrap(
       await supabase
