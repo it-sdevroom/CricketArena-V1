@@ -22,6 +22,8 @@ import { Commentary } from '@/components/Commentary';
 import { CountUp, LivePulse } from '@/components/Motion';
 import { SkeletonList, SkeletonMatchCard, SkeletonPlayerRow } from '@/components/Skeleton';
 import { shareScorecard } from '@/src/lib/scorecard-pdf';
+import { Celebration } from '@/components/Celebration';
+import { TossDialog } from '@/components/TossDialog';
 import { C } from '@/constants/theme';
 import { deliveryLabel, dismissalText } from '@/src/data/mappers';
 import { matches } from '@/src/data/repo';
@@ -39,6 +41,7 @@ export default function MatchCentre() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { can, user } = useAuth();
   const [tab, setTab] = useState<Tab>('live');
+  const [tossOpen, setTossOpen] = useState(false);
   const live = useLiveMatch(id);
   const nameOf = useNameLookup(live.squads);
   const viewers = useViewers(id, live.match?.status === 'live' || live.match?.status === 'innings_break');
@@ -84,8 +87,13 @@ export default function MatchCentre() {
   const isLive = match.status === 'live' || match.status === 'innings_break';
   const canScore = can.score || can.manageTournaments;
 
+  // The newest ball, for the celebration overlay.
+  const latestBall =
+    live.currentState?.overs.at(-1)?.deliveries.at(-1) ?? null;
+
   return (
     <Screen refreshing={live.loading} onRefresh={live.refetch}>
+      <Celebration latest={latestBall} />
       {/* ------------------------------------------------------------ header */}
       <Card style={s.header}>
         <View style={s.headerTop}>
@@ -162,11 +170,19 @@ export default function MatchCentre() {
           !xiSet ? (
             <XiPicker match={match} onDone={live.refetch} />
           ) : (
-            <Button
-              title={isLive ? 'Continue scoring' : 'Open scoring console'}
-              icon="baseball-outline"
-              onPress={() => router.push(`/scorer/${match.id}`)}
-            />
+            match.status === 'scheduled' ? (
+              <Button
+                title="Start match — toss"
+                icon="play-circle-outline"
+                onPress={() => setTossOpen(true)}
+              />
+            ) : (
+              <Button
+                title={isLive ? 'Continue scoring' : 'Open scoring console'}
+                icon="baseball-outline"
+                onPress={() => router.push(`/scorer/${match.id}`)}
+              />
+            )
           )
         ) : null}
 
@@ -214,6 +230,18 @@ export default function MatchCentre() {
           />
         ) : null}
       </View>
+
+      <TossDialog
+        visible={tossOpen}
+        onClose={() => setTossOpen(false)}
+        onStarted={() => {
+          live.refetch();
+          router.push(`/scorer/${match.id}`);
+        }}
+        match={match}
+        homeName={teamName(match.home_team_id)}
+        awayName={teamName(match.away_team_id)}
+      />
 
       <View style={s.tabs}>
         <Segmented

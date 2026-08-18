@@ -6,6 +6,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 
 import { BallChip, Button, Card, ChipGroup, ErrorNotice, Loading, Pill, Screen } from '@/components/UI';
 import { RainDialog } from '@/components/RainDialog';
+import { Celebration } from '@/components/Celebration';
 import { C } from '@/constants/theme';
 import { DISMISSAL_OPTIONS, deliveryLabel } from '@/src/data/mappers';
 import { newIdempotencyKey } from '@/src/data/queue';
@@ -313,6 +314,7 @@ export default function ScoringConsole() {
 
   return (
     <ScrollView style={s.page} contentContainerStyle={s.pageContent}>
+      <Celebration latest={state.overs.at(-1)?.deliveries.at(-1) ?? null} />
       {/* --------------------------------------------------------- scoreboard */}
       <View style={s.topRow}>
         <Pill text={state.closed ? 'INNINGS CLOSED' : '● LIVE'} tone={state.closed ? 'muted' : 'red'} />

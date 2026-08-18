@@ -1478,7 +1478,7 @@ export const corrections = {
     return unwrap(
       await supabase
         .from('score_corrections')
-        .select('*, profiles:performed_by(full_name)')
+        .select('*, profiles(full_name)')
         .eq('match_id', matchId)
         .order('created_at', { ascending: false }),
     );

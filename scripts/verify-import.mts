@@ -108,6 +108,26 @@ async function main() {
     process.exit(1);
   }
 
+  // The follow-up update: game 4 and the corrected start time.
+  await db.exec(await readFile(`${ROOT}/supabase/update-ppp4.sql`, 'utf8'));
+  const after4 = await db.query<any>(`
+    select m.match_order g, m.result_summary,
+           to_char(m.scheduled_at, 'HH24:MI') t
+    from matches m where m.result_kind is not null order by m.match_order`);
+  console.log('\n  After update-ppp4');
+  after4.rows.forEach((r: any) => console.log(`   Game ${r.g} (${r.t}): ${r.result_summary}`));
+  if (after4.rows.length !== 4) {
+    console.error(`  FAIL expected 4 results, got ${after4.rows.length}`);
+    process.exit(1);
+  }
+  const times = await db.query<any>(
+    `select count(*)::int n from matches where extract(hour from scheduled_at) <> 17`);
+  if (times.rows[0].n !== 0) {
+    console.error(`  FAIL ${times.rows[0].n} fixtures not at 17:00`);
+    process.exit(1);
+  }
+  console.log('  ok    all fixtures start at 17:00');
+
   // Re-running must rebuild, not duplicate.
   await db.exec(sql);
   const again = await db.query<any>(`select count(*)::int n from matches`);
