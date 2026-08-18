@@ -34,13 +34,16 @@ export default function Officials() {
   const [selectedMatch, setSelectedMatch] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const upcoming = useQuery({
     queryKey: ['org-fixtures', activeOrg?.id],
     queryFn: () =>
       matches.summaries({
         organizationId: activeOrg!.id,
-        status: ['scheduled', 'toss', 'live', 'innings_break'],
+        // Completed matches are included so officials can still be
+        // recorded afterwards, which is normal when a game is scored on paper.
+        status: ['scheduled', 'toss', 'live', 'innings_break', 'completed'],
         limit: 40,
       }),
     enabled: !!activeOrg,
@@ -94,6 +97,9 @@ export default function Officials() {
       }
       await matches.assignOfficial(selectedMatch, userId, role);
       await queryClient.invalidateQueries({ queryKey: ['match-officials', selectedMatch] });
+
+      const who = members.data?.find((m) => m.id === userId)?.full_name ?? 'They';
+      setNotice(`${who} can now ${role === 'scorer' ? 'score this match' : 'umpire this match'}.`);
     } catch (e) {
       setError(describeError(e));
     } finally {
@@ -152,6 +158,17 @@ export default function Officials() {
           />
         )}
       </Section>
+
+      {notice ? <Text style={s.notice}>{notice}</Text> : null}
+
+      {!selectedMatch ? (
+        <Card style={s.noneCard}>
+          <Text style={s.noneText}>
+            Tap a fixture above first. Appointments are per match, so a scorer can be given one
+            game without being given every game.
+          </Text>
+        </Card>
+      ) : null}
 
       {selectedMatch ? (
         <>
@@ -225,6 +242,7 @@ export default function Officials() {
 }
 
 const s = StyleSheet.create({
+  notice: { color: C.green, fontWeight: '800', fontSize: 13, marginBottom: 12 },
   flex: { flex: 1 },
   lead: { color: C.muted, lineHeight: 21 },
   pressed: { opacity: 0.75 },

@@ -19,21 +19,12 @@ where tournament_id = (select id from tournaments where slug = 'ppp4-summer-spor
 
 -- --- 2. Game 4 -------------------------------------------------------------
 --
--- ⚠️ ASSUMPTION, PLEASE CONFIRM
+-- Confirmed by the organiser:
 --
--- Your message said "Desert XI won the toss and chose to bat first ... they
--- made 162/3 ... while desert XI chased down the target in 9.5 overs".
---
--- Both sides cannot bat first and chase. Read literally it contradicts itself,
--- so I have taken the only self-consistent reading:
---
---     Desert XI    162/3  (10 overs)   — batted first, having won the toss
---     Desert Lions 163/3  (9.5 overs)  — chased, 7 wickets in hand
---     Desert Lions won by 7 wickets
---
--- If it was actually Desert Lions who batted first and Desert XI who chased,
--- swap the two team names in the call below and run it again. It replaces the
--- result rather than adding a second one, so correcting it is safe.
+--     Desert Lions won the toss and chose to bat
+--     Desert Lions 162/4  (10 overs)
+--     Desert XI    163/3  (9.5 overs)  — 7 wickets in hand
+--     Desert XI won by 7 wickets
 
 do $$
 declare
@@ -52,18 +43,18 @@ begin
     raise exception 'Game 4 not found — run import-ppp4.sql first';
   end if;
 
-  -- Toss: Desert XI won it and chose to bat.
+  -- Toss: Desert Lions won it and chose to bat.
   update matches
-  set toss_winner_team_id = t_dxi,
+  set toss_winner_team_id = t_dl,
       toss_decision = 'bat'
   where id = g4;
 
   --                          match, batted first, 1st innings,  2nd innings
   --                                              runs wkts balls  runs wkts balls
-  perform record_summary_match(g4, t_dxi,          162,   3,   60,   163,   3,   59,
+  perform record_summary_match(g4, t_dl,           162,   4,   60,   163,   3,   59,
                                'From scoresheet');
 
-  raise notice 'Game 4 recorded: Desert XI 162/3, Desert Lions 163/3 (9.5 ov)';
+  raise notice 'Game 4: Desert Lions 162/4, Desert XI 163/3 (9.5 ov) — Desert XI by 7 wickets';
 end $$;
 
 -- --- What the table looks like now ------------------------------------------
