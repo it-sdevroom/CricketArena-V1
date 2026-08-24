@@ -178,10 +178,16 @@ export default function TournamentDetail() {
               <Text style={s.headCell}>L</Text>
               <Text style={s.headCell}>PTS</Text>
               <Text style={s.headCellWide}>NRR</Text>
+              <Text style={s.qSpacer} />
             </View>
-            {table.data.map((row, index) => (
-              <View key={row.team_id} style={s.tableRow}>
-                <Text style={s.rank}>{index + 1}</Text>
+            {table.data.map((row, index) => {
+              // Two go through from each group. Only shown once the group is
+              // finished — calling a side qualified while games remain would
+              // be a guess dressed up as a fact.
+              const qualified = row.group_complete && row.group_position <= 2;
+              return (
+              <View key={row.team_id} style={[s.tableRow, qualified && s.qualifiedRow]}>
+                <Text style={s.rank}>{row.group_position ?? index + 1}</Text>
                 <View style={[s.dot, { backgroundColor: row.team_color }]} />
                 <Text style={[s.teamName, s.teamCol]} numberOfLines={1}>
                   {row.team_name}
@@ -194,8 +200,10 @@ export default function TournamentDetail() {
                   {row.net_run_rate > 0 ? '+' : ''}
                   {Number(row.net_run_rate).toFixed(3)}
                 </Text>
+                {qualified ? <Text style={s.qBadge}>Q</Text> : <Text style={s.qSpacer} />}
               </View>
-            ))}
+              );
+            })}
           </Card>
         ) : (
           <EmptyState
@@ -299,6 +307,15 @@ function TournamentStats({ tournamentId }: { tournamentId: string }) {
 }
 
 const s = StyleSheet.create({
+  qualifiedRow: { backgroundColor: C.green + '14' },
+  qBadge: {
+    width: 20,
+    textAlign: 'center',
+    color: C.green,
+    fontWeight: '900',
+    fontSize: 12,
+  },
+  qSpacer: { width: 20 },
   header: { gap: 8 },
   headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   season: { color: C.green, fontWeight: '900', fontSize: 11, letterSpacing: 1 },

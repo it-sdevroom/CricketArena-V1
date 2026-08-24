@@ -303,6 +303,10 @@ export interface MatchSummaryRow {
 }
 
 export interface StandingsRowDb {
+  /** 1-based rank inside the group, by points then NRR then wins. */
+  group_position: number;
+  /** True once every fixture in the group has a result. */
+  group_complete: boolean;
   tournament_id: string;
   team_id: string;
   team_name: string;

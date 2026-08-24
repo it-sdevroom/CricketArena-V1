@@ -128,6 +128,37 @@ async function main() {
   }
   console.log('  ok    all fixtures start at 17:00');
 
+  // Squads and the last two group games.
+  await db.exec(await readFile(`${ROOT}/supabase/add-squads-and-results.sql`, 'utf8'));
+
+  const squads = await db.query<any>(`
+    select t.name, count(tm.player_id)::int n
+    from teams t left join team_members tm on tm.team_id = t.id
+    group by t.name order by t.name`);
+  console.log('\n  Squads');
+  squads.rows.forEach((r: any) => console.log(`   ${String(r.name).padEnd(15)} ${r.n} players`));
+
+  const finalTable = await db.query<any>(`
+    select group_label g, group_position pos, team_short team, played p, won w,
+           lost l, points pts, net_run_rate nrr, group_complete done
+    from tournament_standings
+    where tournament_id = (select id from tournaments where slug='ppp4-summer-sport-2026')
+    order by group_label, group_position`);
+  console.log('\n  Final group tables');
+  console.log('  GRP  #  TEAM   P W L PTS      NRR   Q?');
+  finalTable.rows.forEach((r: any) => {
+    const q = r.done && r.pos <= 2 ? 'Q' : '';
+    console.log(`   ${r.g}   ${r.pos}  ${String(r.team).padEnd(5)} ${r.p} ${r.w} ${r.l}  ${String(r.pts).padEnd(3)} ${String(r.nrr).padStart(7)}   ${q}`);
+  });
+
+  const played = await db.query<any>(
+    `select count(*)::int n from matches where result_kind is not null`);
+  if (played.rows[0].n !== 6) {
+    console.error(`  FAIL expected 6 results, got ${played.rows[0].n}`);
+    process.exit(1);
+  }
+  console.log('  ok    all 6 group games recorded');
+
   // Re-running must rebuild, not duplicate.
   await db.exec(sql);
   const again = await db.query<any>(`select count(*)::int n from matches`);
